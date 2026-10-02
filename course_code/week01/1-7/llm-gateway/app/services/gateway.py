@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class GatewayService:
+    """编排 Prompt、路由、上游调用与用量；HTTP 响应封装由 API 层负责。"""
     def __init__(
         self,
         config: GatewayConfig,
@@ -77,6 +78,7 @@ class GatewayService:
         identity: str,
         prompt_meta: tuple[str | None, int | None],
     ) -> tuple[dict[str, Any], str]:
+        """供应商重试处理传输故障；结构化纠错单独受 structured_output_retries 限制。"""
         request_id = f"req_{uuid.uuid4().hex}"
         started = time.perf_counter()
         requested_model = str(body["model"])
@@ -178,6 +180,7 @@ class GatewayService:
 
         async def generate() -> AsyncIterator[bytes]:
             started = time.perf_counter()
+            # 发送过任意上游字节后不能切换供应商，否则客户端会收到两段不同答案。
             emitted = False
             completed = False
             last_error: GatewayError | None = None

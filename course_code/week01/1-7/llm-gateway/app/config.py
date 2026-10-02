@@ -12,6 +12,7 @@ _ENV_PATTERN = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)(?::-([^}]*))?}")
 
 
 def _expand_env(value: object) -> object:
+    """递归展开 YAML 的 ${NAME:-default}；只读环境变量，不执行 shell 表达式。"""
     if isinstance(value, str):
 
         def replace(match: re.Match[str]) -> str:
@@ -113,6 +114,7 @@ class GatewayConfig(BaseModel):
 
 
 def load_config(path: str | Path | None = None) -> GatewayConfig:
+    """显式路径优先，其次环境变量，最后才回退到课程示例配置。"""
     config_path = Path(path or os.getenv("GATEWAY_CONFIG", "gateway.yaml"))
     if not config_path.is_absolute():
         config_path = Path.cwd() / config_path
@@ -123,6 +125,7 @@ def load_config(path: str | Path | None = None) -> GatewayConfig:
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
     config = GatewayConfig.model_validate(_expand_env(raw))
     db_path = Path(config.database_url)
+    # 数据路径相对于配置文件，避免从不同目录启动时写到不同数据库。
     if not db_path.is_absolute():
         config.database_url = str((config_path.parent / db_path).resolve())
     return config

@@ -15,6 +15,7 @@ class CircuitState:
 
 
 class ModelRouter:
+    """选择首选模型及 fallback；熔断状态只在当前进程共享。"""
     def __init__(self, config: GatewayConfig) -> None:
         self.config = config
         self.circuit_config: CircuitBreakerConfig = config.circuit_breaker
@@ -22,6 +23,7 @@ class ModelRouter:
         self._counters: dict[str, itertools.count] = {}
 
     def candidates(self, model: str, api: str) -> list[RouteTarget]:
+        """先过滤协议、开关与健康状态，再排序；权重只影响首选路由。"""
         route_config = self.config.models.get(model)
         if route_config is None:
             raise GatewayError(
@@ -64,6 +66,7 @@ class ModelRouter:
             state.opened_at = time.monotonic()
 
     def _is_available(self, provider: str) -> bool:
+        # 冷却使用单调时钟，系统时间校准不会改变熔断持续时间。
         state = self._circuits.get(provider)
         if not state or state.opened_at is None:
             return True

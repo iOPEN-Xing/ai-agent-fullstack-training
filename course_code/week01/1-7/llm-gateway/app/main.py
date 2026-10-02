@@ -31,6 +31,7 @@ def create_app(
     *,
     http_client: httpx.AsyncClient | None = None,
 ) -> FastAPI:
+    """在 lifespan 中组装依赖；测试可注入 MockTransport 客户端而不请求真实模型。"""
     gateway_config = config or load_config()
 
     @asynccontextmanager
