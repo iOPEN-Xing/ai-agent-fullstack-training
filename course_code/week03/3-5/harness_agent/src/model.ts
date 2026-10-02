@@ -10,7 +10,8 @@ import {
 } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 
 export const gatewayModel: Model<"openai-completions"> = {
-  id: "agent-default",
+  // 这是网关公开的逻辑别名；可接入 1-7 的 smart 路由，供应商模型仍由网关决定。
+  id: process.env.GATEWAY_MODEL?.trim() || "agent-default",
   name: "Agent Default",
   provider: "phase-gateway",
   api: "openai-completions",
