@@ -30,6 +30,9 @@ def schema_from_request(api: str, body: dict[str, Any]) -> dict[str, Any] | None
     if not isinstance(definition, dict) or not isinstance(definition.get("schema"), dict):
         raise invalid_schema(param, "JSON Schema must be an object")
     schema = definition["schema"]
+    # validator_for 会先以 $schema 查找方言；数组/对象不能作为映射键。
+    if "$schema" in schema and not isinstance(schema["$schema"], str):
+        raise invalid_schema(param, "$schema must be a string")
     try:
         # 按 $schema 选择方言；空对象 {} 也是有效 Schema，不可用 truthiness 跳过。
         validator_for(schema).check_schema(schema)

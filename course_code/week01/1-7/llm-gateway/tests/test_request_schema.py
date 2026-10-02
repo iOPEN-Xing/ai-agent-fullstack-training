@@ -19,6 +19,8 @@ from tests.conftest import gateway_client, make_config
         {"schema": []},
         {"schema": {"type": "not-a-json-type"}},
         {"schema": {"properties": {"name": {"type": 123}}}},
+        {"schema": {"$schema": {}}},
+        {"schema": {"$schema": []}},
     ],
 )
 async def test_invalid_schema_is_rejected_before_upstream(tmp_path, auth_headers, api, stream, definition):
