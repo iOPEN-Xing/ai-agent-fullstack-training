@@ -1,5 +1,27 @@
 ex_ctx/*
 .DS_Store
-/docs/
 node_modules/
 dist/
+
+# 本机配置与密钥；模板应保留在版本控制中。
+.env
+.env.*
+!.env.example
+!.env.*.example
+course_code/week01/1-7/llm-gateway/gateway.yaml
+
+# Python / 测试 / 本地运行产物。
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage/
+.next/
+*.tsbuildinfo
+.agent-runs/
+course_code/week01/1-7/llm-gateway/data/
