@@ -52,6 +52,8 @@ class GatewayService:
     ) -> tuple[dict[str, Any], tuple[str | None, int | None]]:
         body = dict(raw_body)
         body.pop("gateway_prompt", None)
+        # JSON 与 SSE 共用此入口：在发送上游请求或 SSE 响应头之前拒绝非法 Schema。
+        schema_from_request(api, body)
         if prompt_ref is None:
             return body, (None, None)
         prompt, rendered = await self.prompts.render(prompt_ref.id, prompt_ref.variables, prompt_ref.version)

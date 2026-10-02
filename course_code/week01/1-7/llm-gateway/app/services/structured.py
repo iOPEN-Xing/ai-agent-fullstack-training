@@ -4,23 +4,48 @@ import json
 import re
 from typing import Any
 
-from jsonschema import ValidationError, validate
+from jsonschema import SchemaError, ValidationError, validate
+from jsonschema.validators import validator_for
 
-from app.core.errors import StructuredOutputError
+from app.core.errors import GatewayError, StructuredOutputError
 
 _FENCE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL | re.IGNORECASE)
 
 
 def schema_from_request(api: str, body: dict[str, Any]) -> dict[str, Any] | None:
+    """提取并校验调用方的 Schema；请求错误不能等模型生成后才发现。"""
+    param = "response_format" if api == "chat" else "text.format"
     if api == "chat":
-        response_format = body.get("response_format") or {}
-        if response_format.get("type") != "json_schema":
-            return None
-        return (response_format.get("json_schema") or {}).get("schema")
-    text_format = (body.get("text") or {}).get("format") or {}
-    if text_format.get("type") != "json_schema":
+        output_format = body.get("response_format")
+    else:
+        output_format = (body.get("text") or {}).get("format")
+    if output_format is None:
         return None
-    return text_format.get("schema")
+    if not isinstance(output_format, dict):
+        raise invalid_schema(param, "Output format must be an object")
+    if output_format.get("type") != "json_schema":
+        return None
+
+    definition = output_format.get("json_schema") if api == "chat" else output_format
+    if not isinstance(definition, dict) or not isinstance(definition.get("schema"), dict):
+        raise invalid_schema(param, "JSON Schema must be an object")
+    schema = definition["schema"]
+    try:
+        # 按 $schema 选择方言；空对象 {} 也是有效 Schema，不可用 truthiness 跳过。
+        validator_for(schema).check_schema(schema)
+    except SchemaError as exc:
+        raise invalid_schema(param, exc.message) from exc
+    return schema
+
+
+def invalid_schema(param: str, message: str) -> GatewayError:
+    return GatewayError(
+        message,
+        status_code=422,
+        error_type="invalid_request_error",
+        code="invalid_json_schema",
+        param=param,
+    )
 
 
 def content_from_response(api: str, payload: dict[str, Any]) -> str:
