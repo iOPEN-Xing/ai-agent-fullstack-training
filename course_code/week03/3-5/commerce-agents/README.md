@@ -1,3 +1,5 @@
+> 本 fork 的本地 Messages 示例增加了官方 `deepseek-flash` 配置。中文接入与适用范围见 [训练营 DeepSeek 指南](../../../../docs/deepseek.md)。SDK、Managed Agents 和平台部署说明保留原 Anthropic 要求。
+
 # Claude Commerce Agents
 
 Two commerce agents built on Claude: a **shopping agent** a business embeds in its app for

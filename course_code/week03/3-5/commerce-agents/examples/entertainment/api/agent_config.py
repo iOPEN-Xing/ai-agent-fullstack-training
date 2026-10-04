@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from demo_common import host_approval_default
+from demo_common.deepseek import configure_demo_model
 from merchant_agent import MerchantAgentConfig
 from shopping_agent import ShoppingAgentConfig
 
@@ -67,25 +68,29 @@ _PROTECTED_FIELDS = (
 
 
 def build_shopping_config() -> ShoppingAgentConfig:
-    return ShoppingAgentConfig(
-        brand_name="ACME Tickets",
-        assistant_name="ACME Assistant",
-        brand_voice=(
-            "knows the room: upfront about fees and about what is left, and never in a hurry "
-            "to sell"
-        ),
-        enable_disclosures=True,
-        # Matches the engine's per-event hold cap.
-        max_quantity_per_item=8,
-        policy_intent_terms=_SHOPPING_DEFAULTS.policy_intent_terms + _POLICY_TERMS,
+    return configure_demo_model(
+        ShoppingAgentConfig(
+            brand_name="ACME Tickets",
+            assistant_name="ACME Assistant",
+            brand_voice=(
+                "knows the room: upfront about fees and about what is left, and never in a hurry "
+                "to sell"
+            ),
+            enable_disclosures=True,
+            # Matches the engine's per-event hold cap.
+            max_quantity_per_item=8,
+            policy_intent_terms=_SHOPPING_DEFAULTS.policy_intent_terms + _POLICY_TERMS,
+        )
     )
 
 
 def build_merchant_config(store_name: str) -> MerchantAgentConfig:
-    return MerchantAgentConfig(
-        brand_name=store_name,
-        require_host_approval=host_approval_default(),
-        approval_surface="the Approve button on the change preview card",
-        metrics_intent_terms=_MERCHANT_DEFAULTS.metrics_intent_terms + _METRICS_TERMS,
-        protected_fields=_MERCHANT_DEFAULTS.protected_fields + _PROTECTED_FIELDS,
+    return configure_demo_model(
+        MerchantAgentConfig(
+            brand_name=store_name,
+            require_host_approval=host_approval_default(),
+            approval_surface="the Approve button on the change preview card",
+            metrics_intent_terms=_MERCHANT_DEFAULTS.metrics_intent_terms + _METRICS_TERMS,
+            protected_fields=_MERCHANT_DEFAULTS.protected_fields + _PROTECTED_FIELDS,
+        )
     )

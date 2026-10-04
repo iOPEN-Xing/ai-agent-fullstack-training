@@ -37,6 +37,10 @@ A storefront session starts by naming a profile from `data/users.json` (`POST /a
 a merchant session binds to the one merchant the process serves. Every later request carries
 only the session id, in `X-Session-Id`, and the routes read the principal from it.
 
+## DeepSeek profile in this fork
+
+Set `COMMERCE_MODEL_PROVIDER=deepseek`, `DEEPSEEK_API_KEY`, and `DEEPSEEK_MODEL=deepseek-flash` before startup. The four local Messages examples use the official Anthropic-compatible endpoint, disable thinking and hosted web/code tools, and select Flash for the main loop, memory, and analysis. SDK and Managed Agent paths retain their Anthropic requirements. See the [Chinese connection guide](../../../../../docs/deepseek.md) for commands and validation limits.
+
 ## Environment variables
 
 | Variable | Effect | Read in | Default |

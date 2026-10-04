@@ -27,6 +27,7 @@ from commerce_common.streaming import AgentEvent, to_sse
 from commerce_common.turn import session_tag
 from shopping_agent import Cart, Order, ProductDetails, ShoppingSessionContext
 
+from .deepseek import configure_demo_provider
 from .sessions import SessionConflictError, SessionRecord, SessionStore
 
 logger = logging.getLogger(__name__)
@@ -62,11 +63,13 @@ def load_demo_env(example_root: Path) -> None:
     one; ``COMMERCE_DEMO_AUTH=sdk`` clears key variables instead so the Anthropic SDK's
     own credential chain is used."""
     if os.environ.get("COMMERCE_DEMO_AUTH", "").lower() == "sdk":
+        configure_demo_provider()  # 先拒绝 DeepSeek + SDK 组合，再修改任何密钥。
         os.environ.pop("ANTHROPIC_API_KEY", None)
         os.environ.pop("ANTHROPIC_AUTH_TOKEN", None)
     else:
         load_dotenv(example_root / ".env", override=False)
         load_dotenv(REPO_ROOT / ".env", override=False)
+        configure_demo_provider()
 
 
 def host_approval_default() -> bool:
@@ -175,6 +178,12 @@ def stream_turn(
                 yield to_sse(event)
         except anthropic.AuthenticationError:
             logger.exception("chat turn failed: API authentication")
+            if os.environ.get("COMMERCE_MODEL_PROVIDER", "").strip().lower() == "deepseek":
+                yield to_sse(AgentEvent.error(
+                    f"DeepSeek API authentication failed (401). Check DEEPSEEK_API_KEY in "
+                    f"{env_hint} or the supplied environment and restart."
+                ))
+                return
             yield to_sse(
                 AgentEvent.error(
                     f"Anthropic API authentication failed (401). Check ANTHROPIC_API_KEY in "
@@ -187,6 +196,12 @@ def stream_turn(
             logger.exception("chat turn failed")
             described = str(error).lower()
             if any(word in described for word in ("authentication", "credential", "api_key")):
+                if os.environ.get("COMMERCE_MODEL_PROVIDER", "").strip().lower() == "deepseek":
+                    yield to_sse(AgentEvent.error(
+                        f"DeepSeek credentials are unavailable. Set DEEPSEEK_API_KEY in "
+                        f"{env_hint} or the supplied environment and restart."
+                    ))
+                    return
                 yield to_sse(
                     AgentEvent.error(
                         "No Anthropic API credentials are configured, so chat can't run. Set "
