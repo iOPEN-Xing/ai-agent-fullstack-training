@@ -1,6 +1,6 @@
-# Codebase Agent：第一版
+# Codebase Agent：带分层测试的版本
 
-读取登录流程源码，生成 `artifacts/login-flow.md`。本版用于观察模型提议、Runtime 执行和 Loop Guard 的关系。
+在第一版上补齐模型接入、工具投影、Runtime 与 Loop Guard 的测试，用源码阅读任务观察完成证据。
 
 ## 安装与检查
 

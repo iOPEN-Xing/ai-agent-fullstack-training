@@ -1,11 +1,11 @@
-// 真实 Gateway 入口：让模型驱动同一条计划化 Loop。
+// 官方 DeepSeek 入口：让模型驱动同一条计划化 Loop。
 import { cp, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runPlanningAgent } from "./agent-runner.js";
 import { createExecutionContext } from "./run-context.js";
-import { gatewayModel, models } from "./model.js";
+import { deepseekModel, models } from "./model.js";
 
 const PROJECT_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -35,7 +35,7 @@ const executionContext = createExecutionContext({
   runtimeRoot: PROJECT_ROOT,
 });
 const result = await runPlanningAgent({
-  model: gatewayModel,
+  model: deepseekModel,
   streamFn: models.streamSimple.bind(models),
   signal: controller.signal,
   taskPrompt,

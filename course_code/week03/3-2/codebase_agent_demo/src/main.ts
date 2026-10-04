@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCodebaseAgent, type AgentMode } from "./agent-runner.js";
 import { createExecutionContext } from "./run-context.js";
-import { gatewayModel, models } from "./model.js";
+import { deepseekModel, models } from "./model.js";
 
 const PROJECT_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -38,7 +38,7 @@ const executionContext = createExecutionContext({
   runtimeRoot: PROJECT_ROOT,
 });
 const result = await runCodebaseAgent({
-  model: gatewayModel,
+  model: deepseekModel,
   streamFn: models.streamSimple.bind(models),
   mode,
   signal: controller.signal,

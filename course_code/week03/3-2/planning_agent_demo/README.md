@@ -1,52 +1,36 @@
-# Planning Agent Demo
+# Planning Agent
 
-3.2 的配套工程：在 3.1 的 pi Agent Loop 上接入计划层，跑通「修复登录模块到期边界失败测试」的完整闭环。
+在 3-1 的 pi Loop 上增加计划层，任务是修复登录会话到期判断。计划规定依赖和验收证据，Runtime 执行文件操作与测试，完成契约决定何时交付。
 
-## 跑起来
+## 安装与运行
+
+在本目录执行：
 
 ```bash
-npm install
-npm test          # 计划规则 + Loop 集成，共 18 个用例
-npm run build     # tsc 类型检查
-npm start         # 接真实 Gateway，模型驱动同一条 Loop，中文输出
+npm ci
+npm test
+npm run build
+# 根目录 .env 配置完成后才执行真实调用。
+npm start
 ```
 
-## 结构
+真实调用默认直连 `deepseek-flash`，读取根 `.env` 和本目录 `.env`，shell 变量优先；见 [DeepSeek 接入](../../../../docs/deepseek.md)。此版真实入口会操作自己的 fixtures 和 artifacts，建议在临时副本里观察修复；[3-5 Harness](../../3-5/harness_agent/README.md)会自动创建独立工作区。
 
-沿用 3.1 的文件分工，本节新增计划相关模块：
+## 计划与执行
 
-|文件|职责|
-|---|---|
-|`src/model.ts`|模型注册，接入 Gateway（与 3.1 相同）|
-|`src/run-context.ts`|一次 Run 的路径边界，以及目标/边界/回归三组测试范围|
-|`src/runtime.ts`|受控执行入口：读写文件、`apply_patch`、`run_test`，并产出证据|
-|`src/plan-store.ts`|计划状态：依赖检查、证据校验、原子修订、修订预算|
-|`src/plan-tools.ts`|`create_plan` / `get_plan` / `update_plan_step` / `revise_plan`|
-|`src/completion-contract.ts`|完成契约：代码理解任务与修复任务各一份|
-|`src/planning-prompt.ts`|运行提示词与每轮替换的计划快照|
-|`src/pi-tools.ts`|把 Runtime 与计划层适配成 pi 的 AgentTool|
-|`src/loop-guard.ts`|轮数、重复动作、计划门禁、完成契约与 Follow-up|
-|`src/agent-runner.ts`|装配 pi Loop 与计划层|
-|`src/main.ts`|真实 Gateway 入口，打印计划与证据摘要|
-|`tests/plan-store.test.ts`|计划层不变量|
-|`tests/agent-runner.test.ts`|Loop 集成：拦截、证据、修订、完成契约|
-|`fixtures/demo-app/`|目标仓库：登录流程 + 待修复的会话有效期判断|
+| 模块 | 职责 |
+| --- | --- |
+| `plan-store.ts` | 步骤依赖、证据归属、状态、修订预算和原子修订 |
+| `plan-tools.ts` | 创建、查询、更新和修订计划的模型接口 |
+| `planning-prompt.ts` | 注入当前计划快照与行为要求 |
+| `runtime.ts`、`run-context.ts` | 路径、读写、补丁、测试范围和执行证据 |
+| `completion-contract.ts` | 检查计划、有效修改、测试和交付物 |
+| `agent-runner.ts`、`loop-guard.ts` | 编排循环、拦截提前完成并反馈缺项 |
 
-## 案例
+有计划后，写文件、补丁和测试需要带 `planStepId`。依赖尚未完成时不能启动下游步骤；步骤完成需要符合验收要求的本步骤证据。`revise_plan` 保留旧步骤并改接下游依赖，验证失败时原计划不变。
 
-`fixtures/demo-app/src/auth/session-policy.ts` 的 `isSessionExpired` 只比较 UTC 日期，
-会话会晚最多 24 小时失效。CI 里只在跨 UTC 日界线时偶发失败，课堂用固定时钟在
-`tests/session-boundary.test.ts` 里稳定复现。
+## 案例边界
 
-修复前 `tests/session-policy.test.ts` 与 `tests/session-boundary.test.ts` 失败，
-`tests/login-flow.test.ts` 通过。修复只改 `session-policy.ts`，公共 API 不变。
+原 fixtures 只按 UTC 日期判断过期，无法表达“到期时刻即失效”。固定时钟测试可稳定复现，修复应只修改 `session-policy.ts` 并保留公共 API；不要直接提交修复后的 fixtures，因为它是后续 Agent 实验的输入。
 
-## 课堂观察点
-
-1. `modifyPasswordLogic` 在 `reproduce` 完成前不能启动。
-2. 没有证据、证据不属于该步骤、证据满足不了验收条件，三种情况都不能完成。
-3. `revise_plan` 保留旧步骤并标记 `skipped`，下游依赖原子改接到新步骤。
-4. 修订必须带理由和证据，并受 `maxRevisions` 限制；校验失败时原计划一字不变。
-5. 当前代码版本之外的测试通过结果不能用于交付。
-6. 计划已创建时，写入、改代码、跑测试必须携带 `planStepId`，否则在执行前被拦下。
-7. 模型提前给出 Final Answer 不会结束任务，完成契约会拒绝并注入 Follow-up。
+这一版的版本标识和测试证据用于教学；3-5 进一步把测试证据绑定到源码、测试和配置的内容摘要，不能把两版的校验强度视为相同。`artifacts/login-fix.md` 等文件是历史实验产物，当前模型的结果需重新运行观察。

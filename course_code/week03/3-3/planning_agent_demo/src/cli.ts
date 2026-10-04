@@ -1,10 +1,10 @@
 // ============================================================================
 // 课堂项目入口：参数解析、工作区准备、三个入口（运行 / 恢复 / 重跑）与报告输出。
 //
-// 真实 Gateway 入口（src/main.ts）与脚本化实验入口（scripts/child-run.ts）
+// 真实 DeepSeek 模型 入口（src/main.ts）与脚本化实验入口（scripts/child-run.ts）
 // 共用本模块：两者只替换"谁来出下一个工具调用"，参数语义与报告完全一致。
 // 也就是说，课堂上用脚本化模型看到的暂停/审批/重跑行为，
-// 与接真实 Gateway 时走的是同一套代码。
+// 与接真实 DeepSeek 模型 时走的是同一套代码。
 //
 // 参数（属于课堂项目入口，不是 pi CLI 的参数）：
 //   --workspace <dir>     工作区；恢复与重跑必须指向同一个工作区
@@ -150,7 +150,7 @@ export interface CliModel {
 
 export interface RunCliOptions {
   argv: string[];
-  /** 由入口决定模型：真实 Gateway 或脚本化 faux。 */
+  /** 由入口决定模型：真实 DeepSeek 模型 或脚本化 faux。 */
   createModel: (command: CliCommand) => CliModel | Promise<CliModel>;
   signal?: AbortSignal;
   /** 文本增量输出（模型自然语言回复）。 */

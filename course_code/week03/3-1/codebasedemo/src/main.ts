@@ -1,12 +1,12 @@
-// CLI 入口：用 Gateway 逻辑模型启动 Agent。
+// CLI 入口：用官方 DeepSeek 模型启动 Agent。
 // 只负责启动与输出；Prompt、工具、循环保护与 Loop 配置全部来自装配层。
 import { runCodebaseAgent } from "./agent-runner.js";
-import { gatewayModel, models } from "./model.js";
+import { deepseekModel, models } from "./model.js";
 
 const controller = new AbortController();
 
 const result = await runCodebaseAgent({
-  model: gatewayModel,
+  model: deepseekModel,
   streamFn: models.streamSimple.bind(models),
   signal: controller.signal,
   // 模型文本增量写入标准输出。

@@ -1,32 +1,30 @@
-# Codebase Agent Demo
+# Codebase Agent：修复任务对照组
 
+使用代码理解 Loop 执行登录会话修复任务，通过可注入完成契约判断结果；没有 Planning 计划层，用来与同章计划组对照。
 
-## 结构
+## 安装与检查
 
-- `src/model.ts`：通过 OpenAI-compatible Gateway 注册 `pi` 模型。
-- `src/runtime.ts`：代码库工具的受控执行入口，限制读取范围并只允许写入 `artifacts/`。
-- `src/pi-tools.ts`：将 Runtime 工具适配为 `pi` 的 `AgentTool`。
-- `src/loop-guard.ts`：最大轮数、重复动作、完成证据和 Follow-up 控制。
-- `src/agent-runner.ts`：装配 `runAgentLoop`，并输出以 `runId`、`turn`、`toolCallId` 为核心的执行轨迹。
-- `tests/loop.test.ts`：用 `pi-ai` faux provider 进行脚本化 TDD 验收。
-
-## 安装与验证
+在本目录执行，要求 Node.js 22.19.0+：
 
 ```bash
-npm install --legacy-peer-deps
-npm run build
+npm ci
 npm test
+npm run build
 ```
 
-## 真实 Gateway 演示
+测试使用脚本化模型，不加载密钥文件。真实调用使用 `deepseek-flash` 官方 Chat 接口；在仓库根目录配置 `.env` 后执行本目录的 `npm start`。它会先读取根 `.env` 再读取本目录 `.env`，shell 变量优先。配置说明见 [DeepSeek 接入](../../../../docs/deepseek.md)。
 
-```bash
-export GATEWAY_BASE_URL="http://127.0.0.1:8000/v1"
-export GATEWAY_API_KEY="<阶段一 Gateway Key>"
-npm run start
-```
+真实入口按本版上下文操作 fixtures 与 artifacts，建议复制到临时目录实验。需要自动建立独立工作区的完整实验，使用 [3-5 Harness](../../3-5/harness_agent/README.md)。
 
-## 测试
-```bash
-npm test -- --reporter=verbose
-```
+## 代码阅读顺序
+
+| 文件 | 看什么 |
+| --- | --- |
+| `src/model.ts` | 官方地址、鉴权来源、模型能力与输出预算 |
+| `src/runtime.ts` | 允许的路径和动作，工具执行结果 |
+| `src/pi-tools.ts` | Runtime 工具如何转换成 pi AgentTool |
+| `src/loop-guard.ts` | 轮数、重复动作、完成条件与 Follow-up |
+| `src/agent-runner.ts` | 上下文、工具结果和下一轮如何连接 |
+| `tests/` | 各层接受和拒绝哪些行为 |
+
+模型的最终文字不能替代完成证据。此版运行在宿主机，不提供容器或网络隔离；原始 fixtures 和课堂产物用于学习对照。
