@@ -71,7 +71,7 @@ def build_client():
 def stream_model_response(metrics: StreamMetrics) -> str:
     client = build_client()
     response = client.chat.completions.create(
-        model="deepseek-v4-flash",
+        model="deepseek-flash",
         messages=[
             {
                 "role": "user",

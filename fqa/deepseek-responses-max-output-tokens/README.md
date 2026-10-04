@@ -1,3 +1,5 @@
+> 历史记录：下文保留原模型名与当时结果，不能据此判断当前服务行为。复现脚本现默认使用 `deepseek-flash`，可用 `--model deepseek-v4-flash` 对照旧别名。当前接口联调见 [DeepSeek 说明](../../docs/deepseek.md)。
+
 # DeepSeek Responses API `max_output_tokens` 异常
 
 > 调查日期：2026-08-25

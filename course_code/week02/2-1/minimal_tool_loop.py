@@ -36,7 +36,7 @@ async def run_order_agent(
         print([tool["function"]["name"] for tool in visible_tools])
         print("=== 请求 DeepSeek ===")
         response = client.chat.completions.create(
-            model="deepseek-v4-flash",
+            model="deepseek-flash",
             messages=messages,
             tools=visible_tools,
             tool_choice="auto",

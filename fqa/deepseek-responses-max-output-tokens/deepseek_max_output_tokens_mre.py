@@ -146,7 +146,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--transport", choices=("sdk", "raw", "both"), default="both")
     parser.add_argument("--case", choices=("all", "1", "2", "3", "4"), default="all")
-    parser.add_argument("--model", default="deepseek-v4-flash")
+    parser.add_argument("--model", default="deepseek-flash")
     parser.add_argument("--limit", type=int, default=1000)
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--output", type=Path, help="Optional JSONL result path")

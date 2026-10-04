@@ -24,7 +24,7 @@ def build_client() -> AsyncOpenAI:
 async def stream_deepseek(prompt: str) -> AsyncIterator[dict[str, Any]]:
     client = build_client()
     stream = await client.chat.completions.create(
-        model="deepseek-v4-flash",
+        model="deepseek-flash",
         messages=[
             {
                 "role": "system",

@@ -9,7 +9,7 @@ client = OpenAI(
 )
 
 response = client.responses.create(
-    model="deepseek-v4-flash",
+    model="deepseek-flash",
     instructions=(
         "你是代码审查助手。只指出会影响正确性的问题，"
         "没有证据时不要猜测。"

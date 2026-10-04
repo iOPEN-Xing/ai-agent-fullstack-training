@@ -8,7 +8,7 @@ import httpx
 
 
 DEFAULT_BASE_URL = "https://api.deepseek.com"
-DEFAULT_MODEL = "deepseek-v4-flash"
+DEFAULT_MODEL = "deepseek-flash"
 DEFAULT_SYSTEM_PROMPT = "你是代码审查助手，只报告有证据的问题。"
 
 

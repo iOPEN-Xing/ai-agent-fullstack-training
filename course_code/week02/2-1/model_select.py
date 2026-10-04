@@ -25,7 +25,7 @@ messages = [
 ]
 
 response = client.chat.completions.create(
-    model="deepseek-v4-flash",
+    model="deepseek-flash",
     messages=messages,
     tools=[SEARCH_ORDERS.to_model_tool()],
     tool_choice="auto",

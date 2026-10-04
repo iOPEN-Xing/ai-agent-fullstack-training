@@ -2,7 +2,7 @@ import os
 from collections import Counter
 from openai import OpenAI
 
-MODEL = "deepseek-v4-flash"
+MODEL = "deepseek-flash"
 TRIALS = int(os.getenv("TRIALS", "3"))
 PROMPT = (
     "为一个“把模型错误统一归一化”的 Python 函数起更短的名字。"
@@ -49,7 +49,8 @@ def main() -> None:
             top_p=1.0,
         )
 
-    print("\n=== 固定 temperature=1.0，只观察 top_p ===")
+    # DeepSeek 非思考模式固定 top_p=1；这一组是无效参数对照，不是效果实验。
+    print("\n=== 非思考模式 top_p 无效参数对照 ===")
     for top_p in [1.0, 0.7, 0.3, 0.1]:
         run_case(
             label="top_p 对照组",

@@ -2,7 +2,7 @@ import json
 from openai import OpenAI
 
 class DeepSeekChatAdapter(ModelAdapter):
-    name = "deepseek-v4-flash-chat"
+    name = "deepseek-flash-chat"
     capabilities = ModelCapabilities(
         chat_completions=True,
         responses=False,
@@ -37,7 +37,7 @@ class DeepSeekChatAdapter(ModelAdapter):
             kwargs["top_p"] = request.top_p
 
         raw = self.client.chat.completions.create(
-            model="deepseek-v4-flash",
+            model="deepseek-flash",
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": request.user},

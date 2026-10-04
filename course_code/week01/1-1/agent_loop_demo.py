@@ -165,7 +165,7 @@ async def llm_complete(messages: list[dict], on_text_delta=None) -> str:
 
     def _call() -> str:
         response = client.chat.completions.create(
-            model="deepseek-v4-flash",
+            model="deepseek-flash",
             messages=[{"role": "system", "content": SYSTEM}, *to_llm(messages)],
             stream=True,
             reasoning_effort="low",

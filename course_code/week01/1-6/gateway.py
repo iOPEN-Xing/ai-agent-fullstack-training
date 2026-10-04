@@ -117,14 +117,14 @@ class ModelConfig:
 
 MODEL_CONFIGS = {
     "general-primary": ModelConfig(
-        provider_model=os.getenv("PRIMARY_PROVIDER_MODEL", "deepseek-v4-flash"),
+        provider_model=os.getenv("PRIMARY_PROVIDER_MODEL", "deepseek-flash"),
         base_url=os.getenv("PRIMARY_BASE_URL", "https://api.deepseek.com"),
         api_key_env="DEEPSEEK_API_KEY",
         supports_structured_output=True,
         structured_output_mode="json_object",
     ),
     "general-backup": ModelConfig(
-        provider_model=os.getenv("BACKUP_PROVIDER_MODEL", "deepseek-chat"),
+        provider_model=os.getenv("BACKUP_PROVIDER_MODEL", "deepseek-flash"),
         base_url=os.getenv("BACKUP_BASE_URL", "https://api.deepseek.com"),
         api_key_env="DEEPSEEK_BACKUP_API_KEY",
         supports_structured_output=True,

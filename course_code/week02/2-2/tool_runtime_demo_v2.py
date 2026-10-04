@@ -406,7 +406,7 @@ async def run_agent(user_prompt: str) -> str:
 
     for _ in range(4):
         response = await client.chat.completions.create(
-            model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+            model=os.getenv("DEEPSEEK_MODEL", "deepseek-flash"),
             messages=messages,
             tools=snapshot.provider_tools(),
         )

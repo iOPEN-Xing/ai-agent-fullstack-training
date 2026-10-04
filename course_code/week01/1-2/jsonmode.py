@@ -7,8 +7,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 
 class AgentAction(BaseModel):
-    # 概念：先用 Pydantic 定义“期望输出结构”，把输出格式从“自然语言约定”
-    # 升级成“代码里的显式契约”。这样既方便人阅读，也方便程序做自动校验。
+    # 同一类型定义用于生成提示中的 Schema 和本地校验，避免字段漂移。
     step: Literal["inspect_logs", "run_tests", "read_code", "ask_user"] = Field(
         description="Agent 下一步要执行的动作"
     )
@@ -22,12 +21,11 @@ client = OpenAI(
     max_retries=0,
 )
 
-# Pydantic 可以直接把模型转成 JSON Schema，避免我们手写字段说明。
-# 好处是：提示词、数据结构、校验规则三者共用一份定义，不容易随着迭代逐渐漂移。
+# 这里的 Schema 只写进提示词；json_object 不提供原生 Schema 约束。
 schema = AgentAction.model_json_schema()
 
 response = client.chat.completions.create(
-    model="deepseek-v4-flash",
+    model="deepseek-flash",
     messages=[
         {
             "role": "system",
@@ -42,8 +40,7 @@ response = client.chat.completions.create(
             "content": "目标：检查 tests/test_api.py 为什么失败。当前还没有测试日志。",
         },
     ],
-    # JSON mode 的价值：强约束模型返回合法 JSON，减少多余解释、Markdown 包裹、
-    # 漏括号等格式问题，让下游代码更容易稳定解析。
+    # JSON mode 约束 JSON 语法，字段、类型和业务含义仍需本地校验。
     response_format={"type": "json_object"},
     max_tokens=1024,
     extra_body={"thinking": {"type": "disabled"}},
@@ -54,9 +51,7 @@ if not raw_text:
     raise RuntimeError("MODEL_EMPTY_RESPONSE: 模型没有返回任何内容")
 
 try:
-    # Pydantic 的价值：JSON mode 只能尽量保证“像 JSON”，但不能保证字段名、枚举值、
-    # 类型和数值范围都完全符合业务要求；这里再做一次模型校验，才能把输出真正变成
-    # “可直接进入业务逻辑”的结构化数据。
+    # 拒绝枚举和范围错误；这个示例未启用严格类型，也没有纠错或业务授权。
     action = AgentAction.model_validate_json(raw_text)
 except ValidationError as exc:
     raise RuntimeError(f"MODEL_SCHEMA_INVALID: {exc}") from exc

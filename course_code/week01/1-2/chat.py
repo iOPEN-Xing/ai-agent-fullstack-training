@@ -23,7 +23,7 @@ messages = [
 ]
 
 completion = client.chat.completions.create(
-    model="deepseek-v4-flash",
+    model="deepseek-flash",
     messages=messages,
     max_tokens=512,
     extra_body={"thinking": {"type": "disabled"}},

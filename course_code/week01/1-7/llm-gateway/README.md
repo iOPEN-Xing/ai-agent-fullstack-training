@@ -1,8 +1,10 @@
 # Unified LLM Gateway（Python）
 
-一个面向 Agent Engineering Platform 的统一模型入口。它对上提供 OpenAI Compatible API，对下连接多个 OpenAI-compatible 供应商，并在网关层集中处理模型路由、流式转发、结构化输出、Prompt 模板、用量与成本记录、重试、限流和故障转移。
+第一周 1-7 的统一模型入口。它对上提供 OpenAI Compatible API，对下连接多个 OpenAI-compatible 供应商，并在网关层集中处理模型路由、流式转发、结构化输出、Prompt 模板、用量与成本记录、重试、限流和故障转移。
 
 本项目借鉴了 [CC Switch](https://github.com/farion1231/cc-switch/tree/main/src) 的供应商配置、故障转移、Prompt 管理和用量统计等模块化思路，重新设计为可部署的 Python/FastAPI 服务端。
+
+默认示例只接入官方 DeepSeek 的 `deepseek-flash`；`smart`、`fast` 是同一模型的两个别名。六个第三周 Agent 默认官网直连，不经过本服务。完整配置与接口差异见 [DeepSeek 接入](../../../../docs/deepseek.md)。
 
 ## 已实现能力
 
@@ -86,6 +88,7 @@ response = client.chat.completions.create(
     messages=[{"role": "user", "content": "解释什么是 Agent Loop"}],
     temperature=0.2,
     max_tokens=800,
+    extra_body={"thinking": {"type": "disabled"}},
 )
 print(response.choices[0].message.content)
 ```
@@ -98,6 +101,7 @@ stream = client.chat.completions.create(
     messages=[{"role": "user", "content": "写一个 FastAPI SSE 示例"}],
     stream=True,
     stream_options={"include_usage": True},
+    extra_body={"thinking": {"type": "disabled"}},
 )
 for chunk in stream:
     if chunk.choices and chunk.choices[0].delta.content:
@@ -121,39 +125,39 @@ curl http://localhost:8000/v1/streams/req_xxx/checkpoint \
 curl http://localhost:8000/v1/responses \
   -H 'Authorization: Bearer replace-with-a-long-random-secret' \
   -H 'Content-Type: application/json' \
-  -d '{"model":"smart","input":"用三点解释模型路由"}'
+  -d '{"model":"smart","input":"用三点解释模型路由","reasoning":{"effort":"none"}}'
 ```
 
 路由目标必须在 `gateway.yaml` 中声明 `api: responses` 或 `api: both`。网关按协议透明代理，不会把不支持 Responses API 的 Chat Completions 供应商强行伪装成 Responses API。
 
 ## Structured Output
 
-Chat Completions 示例：
+默认 DeepSeek 路由的原生 Schema 使用 Responses。当前 Chat 接口接受 `json_object`，对 `json_schema` 返回 400；网关不自动转换供应商协议，也不会把上游 400 当作格式纠错重试。其他供应商支持 Chat Schema 时才使用 `response_format.json_schema`。
 
 ```python
-response = client.chat.completions.create(
+response = client.responses.create(
     model="smart",
-    messages=[{"role": "user", "content": "提取：Ada，36岁"}],
-    response_format={
+    input="提取 Ada，36 岁，返回 JSON 中的 name 和 age。",
+    reasoning={"effort": "none"},
+    max_output_tokens=384,
+    text={"format": {
         "type": "json_schema",
-        "json_schema": {
-            "name": "person",
-            "strict": True,
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "age": {"type": "integer"},
-                },
-                "required": ["name", "age"],
-                "additionalProperties": False,
-            },
+        "name": "person",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
+            "required": ["name", "age"],
+            "additionalProperties": False,
         },
-    },
+    }},
 )
+print(response.output_text)
 ```
 
-处理链路是：Schema 传给上游模型 → 获取响应 → 本地 `jsonschema` 再校验 → 失败时附带准确校验错误让模型修复 → 达到重试上限后返回 HTTP 422。流式输出会透传原生 Schema，但无法在已经发送内容后进行无损纠错，因此严格业务协议建议使用非流式接口。
+处理时先校验调用方 Schema 自身是否合法，非法请求在访问上游前返回 422；合法请求发送给供应商，再对非流式输出做本地 `jsonschema` 校验。结果不合规时反馈错误，最多按 `structured_output_retries` 纠错，仍不合规则返回 422。业务组合规则还需要调用方自己验证。
+
+流式输出透传供应商事件，不做完整的本地 Schema 校验与纠错。需要严格业务协议时使用非流式入口，并核对供应商支持的 Schema 子集。
 
 ## Prompt 模板与版本
 
@@ -190,6 +194,8 @@ curl http://localhost:8000/v1/prompts \
 Prompt 模板可以降低重复和配置漂移，但不能从根本上消除 Prompt Injection。生产应用仍应隔离不可信输入、限制工具权限、校验工具参数，并把模型输出当作不可信数据处理。
 
 ## 模型路由配置
+
+默认配置只有一个上游，不能提供跨供应商容灾。下面展示多供应商配置方式；必须核对每条路由的实际协议和模型能力后再启用。
 
 ```yaml
 providers:
@@ -279,8 +285,8 @@ app/
 ## 验证
 
 ```bash
-uv run pytest -q
-uv run ruff check .
+uv run --locked --extra dev pytest -q
+uv run --locked --extra dev ruff check .
 docker build -t unified-llm-gateway .
 ```
 

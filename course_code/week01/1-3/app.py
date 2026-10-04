@@ -114,7 +114,7 @@ class RunState:
 RUNS: dict[str, RunState] = {}
 RUN_TASKS: dict[str, asyncio.Task[None]] = {}
 
-MODEL_NAME = "deepseek-v4-flash"
+MODEL_NAME = "deepseek-flash"
 SYSTEM_PROMPT = "你是代码审查助手，只报告有证据的问题。"
 _model_instance: StreamingModel | None = None
 
