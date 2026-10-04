@@ -45,6 +45,8 @@ export async function executeTestProcess(
   let failure: Error | undefined;
   let escalation: NodeJS.Timeout | undefined;
   let deadline: NodeJS.Timeout | undefined;
+  let cleanupTimeout: NodeJS.Timeout | undefined;
+  let rejectCompletion: (error: Error) => void;
 
   const groupExists = (): boolean => {
     if (!child.pid) return false;
@@ -53,8 +55,13 @@ export async function executeTestProcess(
       process.kill(-child.pid, 0);
       return true;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
-      throw error;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ESRCH") return false;
+      // macOS 回收只剩退出进程的组时，killpg(0) 也可能短暂返回 EPERM。
+      // 此时仍视为未确认清理，继续轮询；持续 EPERM 会触发下方清理期限。
+      // 不能在 exit 回调中抛出，也不能把权限不足误判成“进程已消失”。
+      if (code !== "EPERM") failure ??= error instanceof Error ? error : new Error(String(error));
+      return true;
     }
   };
   const send = (signal: NodeJS.Signals): void => {
@@ -63,7 +70,8 @@ export async function executeTestProcess(
       if (grouped) process.kill(-child.pid, signal);
       else child.kill(signal);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ESRCH" && !(grouped && code === "EPERM")) {
         failure ??= error instanceof Error ? error : new Error(String(error));
       }
     }
@@ -73,6 +81,11 @@ export async function executeTestProcess(
     terminating = true;
     send("SIGTERM");
     escalation = setTimeout(() => send("SIGKILL"), grace);
+    // 信号被拒绝时，存活的后代还可能一直占着管道，close 永远不触发。
+    // 终止等待也必须有期限；失败保留为失败，不声称已清理整个进程组。
+    cleanupTimeout = setTimeout(() => {
+      rejectCompletion(new Error(`TEST_PROCESS_CLEANUP_FAILED: process group ${child.pid} did not close`));
+    }, grace + 5_000);
   };
   const abort = (): void => {
     cancelled = true;
@@ -92,7 +105,8 @@ export async function executeTestProcess(
   child.once("exit", () => {
     if (groupExists()) terminate();
   });
-  const completion = new Promise<{ exitCode: number | null; signal: NodeJS.Signals | null }>((resolve) => {
+  const completion = new Promise<{ exitCode: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+    rejectCompletion = reject;
     child.once("error", (error) => { failure ??= error; });
     child.once("close", (exitCode, signal) => {
       closed = true;
@@ -132,5 +146,6 @@ export async function executeTestProcess(
     options.signal?.removeEventListener("abort", abort);
     if (deadline) clearTimeout(deadline);
     if (escalation) clearTimeout(escalation);
+    if (cleanupTimeout) clearTimeout(cleanupTimeout);
   }
 }
