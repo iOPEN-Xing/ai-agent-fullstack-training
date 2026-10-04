@@ -223,7 +223,7 @@ def create_provider() -> OpenAIProvider:
             base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
             max_retries=0,
         ),
-        os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+        os.getenv("DEEPSEEK_MODEL", "deepseek-flash"),
     )
 
 

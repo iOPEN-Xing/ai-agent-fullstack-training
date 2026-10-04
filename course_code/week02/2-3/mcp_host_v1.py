@@ -50,10 +50,10 @@ class DeepSeekProvider:
         api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
             raise RuntimeError("请先设置环境变量 DEEPSEEK_API_KEY")
-        self.model = os.getenv("LLM_MODEL", "deepseek-chat")
+        self.model = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
         self.client = AsyncOpenAI(
             api_key=api_key,
-            base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
+            base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
             max_retries=0,
         )
 

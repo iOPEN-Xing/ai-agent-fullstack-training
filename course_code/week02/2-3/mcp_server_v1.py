@@ -5,10 +5,7 @@ import sys
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-# 如果提示“ModuleNotFoundError: No module named 'mcp'”，请先安装 mcp 库
-# pip install mcp
-
-# 然后运行以下代码
+# 这里使用 SDK v2 的 MCPServer；依赖与 Client 启动命令见本章 README。
 
 mcp = MCPServer(
     "order-service",
