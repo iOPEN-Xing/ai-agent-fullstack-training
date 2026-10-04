@@ -1,5 +1,5 @@
 // 代码库工具的受控执行入口。
-// 3.2 在 3.1 的 list/search/read/write 之外补上「修复闭环」需要的两个动作：
+// Harness 沿用 list/search/read/write，并通过以下两个动作建立修复证据：
 //   apply_patch：在目标仓库内做最小源码修改；
 //   run_test：按约定范围运行测试，返回真实退出码。
 // 这两个动作是计划层的证据来源：改动的 diff 与测试的 exitCode 只能由 Runtime 写入。
@@ -11,7 +11,7 @@ import type { DemoExecutionContext } from "./run-context.js";
 import type { EvidenceKind } from "./plan-store.js";
 import { computeRepoDigest } from "./checkpoint.js";
 import type { CompletionState } from "./completion-contract.js";
-import { executeTestProcess } from "./test-process.js";
+import { executeTestProcess, type TestProcessResult } from "./test-process.js";
 
 
 /** Runtime 产出的证据草稿；步骤 ID 与工具调用 ID 由计划层补全。 */
@@ -426,19 +426,7 @@ export class DemoToolRuntime {
       // 执行器只有确认进程组退出后才返回；没有悬挂进程才能清除此标记。
       this.unfinishedTests.delete(request.toolCallId);
       afterDigest = await this.captureVerificationDigest(request.context);
-      if (cancelled) {
-        code = "ABORTED";
-        message = "测试已取消，相关进程已退出；需要重新验证";
-      } else if (timedOut) {
-        code = "TEST_TIMEOUT";
-        message = "测试超时，相关进程已退出；需要重新验证";
-      } else if (exitCode === null) {
-        code = "TEST_RESULT_UNKNOWN";
-        message = "测试未获得正常退出码，不能作为通过证据";
-      } else if (beforeDigest !== afterDigest) {
-        code = "TEST_INPUT_CHANGED";
-        message = "测试期间源码、测试或配置发生变化；本次结果无效，请重新运行";
-      }
+      ({ code, message } = classifyTestResult(result, beforeDigest === afterDigest));
     } catch (error) {
       cancelled = request.signal?.aborted ?? false;
       code = "TEST_RESULT_UNKNOWN";
@@ -469,6 +457,23 @@ export class DemoToolRuntime {
   private bump(toolName: string): void {
     this.callCounts.set(toolName, (this.callCounts.get(toolName) ?? 0) + 1);
   }
+}
+
+/** 按优先级判读已结束的进程；退出 1 是测试失败，仍是已知、完整的执行结果。 */
+function classifyTestResult(result: TestProcessResult, stable: boolean): { code: string; message: string } {
+  if (result.cancelled) {
+    return { code: "ABORTED", message: "测试已取消，相关进程已退出；需要重新验证" };
+  }
+  if (result.timedOut) {
+    return { code: "TEST_TIMEOUT", message: "测试超时，相关进程已退出；需要重新验证" };
+  }
+  if (result.exitCode === null) {
+    return { code: "TEST_RESULT_UNKNOWN", message: "测试未获得正常退出码，不能作为通过证据" };
+  }
+  if (!stable) {
+    return { code: "TEST_INPUT_CHANGED", message: "测试期间源码、测试或配置发生变化；本次结果无效，请重新运行" };
+  }
+  return { code: "OK", message: "" };
 }
 
 function contentHash(content: string): string {
