@@ -1,2 +1,0 @@
-# Client / MCPServer 是官方 Python SDK v2 接口；Commerce 使用独立的 v1 环境。
-mcp==2.2.0

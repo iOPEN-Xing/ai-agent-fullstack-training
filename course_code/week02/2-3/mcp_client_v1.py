@@ -12,18 +12,32 @@ base_dir = Path(__file__).parent
 
 
 def result_payload(result: Any, max_chars: int = 2_000) -> dict[str, Any]:
-    """将不可信的 MCP Tool Result 归一化，并限制返回内容大小。"""
+    """统一远端业务结果；成功和错误都受序列化后的字符预算约束。"""
+    if max_chars < 128:
+        raise ValueError("max_chars 至少为 128，需容纳标准错误结果")
+    texts = []
+    for block in result.content:
+        text = getattr(block, "text", None)
+        if isinstance(text, str):
+            texts.append(text)
+    text = "\n".join(texts)
     if result.is_error:
-        text = getattr(result.content[0], "text", "MCP_TOOL_ERROR")
-        return {"ok": False, "code": "MCP_TOOL_ERROR", "message": text[:max_chars]}
+        payload = {"ok": False, "code": "MCP_TOOL_ERROR", "message": text or "远端工具执行失败"}
+    elif result.structured_content is not None:
+        value = result.structured_content
+        if not isinstance(value, dict) or ("ok" in value and not isinstance(value["ok"], bool)):
+            return {"ok": False, "code": "MCP_RESULT_INVALID"}
+        payload = {"ok": True, **value}
+    else:
+        payload = {"ok": True, "text": text}
 
-    value = result.structured_content
-    if value is None:
-        value = {"text": getattr(result.content[0], "text", "")}
-
-    if len(json.dumps(value, ensure_ascii=False)) > max_chars:
+    try:
+        serialized = json.dumps(payload, ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError):
+        return {"ok": False, "code": "MCP_RESULT_INVALID"}
+    if len(serialized) > max_chars:
         return {"ok": False, "code": "RESULT_TOO_LARGE"}
-    return dict(value)
+    return payload
 
 
 async def main() -> None:
