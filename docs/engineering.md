@@ -1,111 +1,156 @@
-# 项目分析与工程化整理
+# 工程结构与设计边界
 
-## 仓库定位
+本仓库是课程示例集合，不是一个统一启动的产品。相邻版本重复代码，是为了展示新增一层能力后行为怎样变化；工程整理保留这些对照，把完整入口、检查方法和限制写清楚。具体文件的可运行性见[课程指南](course-guide.md)，配置见 [DeepSeek 接入](deepseek.md)。
 
-本 fork 基于 `Blackoutta/ai-agent-fullstack-training`，本轮分析的上游提交为 `15f2eef`。原始仓库包含 907 个文件，主要是 297 个 Python 文件、217 个 TypeScript 文件、142 个 TSX 文件，以及 17 份 PDF。`course_materials/` 是课件，`course_code/` 是逐阶段示例，`fqa/` 保存特定模型接口问题的复现材料。
+## 从一次任务看分层
 
-课程从模型访问逐渐增加工具治理、计划、恢复与 Harness。重复目录体现不同阶段的能力差异，阅读时沿课程顺序比较；工程增强优先落在完整版本并保留前后对照。
-
-| 范围 | 主体 | 阅读重点 |
-| --- | --- | --- |
-| Week 01 / 1-1 至 1-5 | 单文件 Python 示例 | API、流式事件、Prompt、输出协议 |
-| Week 01 / 1-6 | Gateway 原型 | 统一调用入口与适配层 |
-| Week 01 / 1-7 / llm-gateway | FastAPI 服务 | 路由、fallback、结构化纠错、SQLite 用量账本 |
-| Week 02 / 2-2、2-4 | Tool Runtime 与治理 | 工具快照、参数校验、权限、审批、超时和审计 |
-| Week 03 / 3-1 | Codebase Agent | pi Loop 与工具执行边界 |
-| Week 03 / 3-2 | Planning Agent | 计划依赖、证据与完成契约 |
-| Week 03 / 3-3 | State / Checkpoint | 显式状态、原子存档、恢复与补丁审批 |
-| Week 03 / 3-4 | Sandbox | 本机与容器执行边界 |
-| Week 03 / 3-5 / harness_agent | 最终 Harness | 内容绑定证据、取消传播、恢复现场核验 |
-| Week 03 / 3-5 / commerce-agents | Anthropic 参考工程 | Shopping / Merchant 共用契约与四种行业示例 |
-
-## Gateway 的代码调用链
-
-从 `app/main.py:create_app` 开始：生命周期创建 Prompt Repository、Usage Repository、Router、Upstream Client 和 Gateway Service，并装入 `app.state`。
-
-1. `app/api/routes.py`：Pydantic 解析 HTTP 输入，依赖注入执行鉴权和限流。
-2. `GatewayService.prepare_body`：检查输出 Schema，去掉网关专用字段并渲染版本化 Prompt。
-3. `ModelRouter.candidates`：过滤协议、开关与熔断状态，给出首选和 fallback。
-4. `UpstreamClient`：执行 HTTP 调用；`GatewayService` 控制有限重试、结构化修复与流式转发。
-5. `structured.py`：验证模型输出；`usage.py`：记录用量、耗时与配置价格计算出的成本。
-
-调用方非法 Schema 属于请求错误。修复后，Chat Completions 和 Responses 的 JSON/SSE 请求都在访问上游前返回 422，错误码为 `invalid_json_schema`。合法的空 Schema `{}` 和已支持的结构化纠错仍然可用。
-
-Schema 检查使用库提供的方言选择与 `check_schema`，依据 [jsonschema 官方文档](https://python-jsonschema.readthedocs.io/en/stable/validate/)。该检查验证 Schema 的结构；具体供应商的 Schema 子集、外部引用策略和模型能力仍由部署方约束。
-
-## Harness 的代码调用链
+以“修复登录会话过期判断”为例：模型根据源码和测试结果提出下一步；Runtime 决定工具是否可执行并执行；计划层记录步骤依赖；状态与存档记录现场；完成契约检查最终代码、测试和交付物。模型返回“已经完成”只是一次输出，不能替代这些检查。
 
 ```mermaid
 flowchart LR
-    CLI[CLI / 任务输入] --> Loop[Agent Loop]
-    Loop --> Plan[计划与完成契约]
-    Loop --> Runtime[Tool Runtime]
-    Runtime --> Approval[具体补丁审批]
-    Approval --> Workspace[临时工作区]
-    Runtime --> Tests[真实测试进程]
-    Tests --> Evidence[内容摘要与证据]
-    Evidence --> Plan
-    Loop --> Checkpoint[业务存档]
-    Checkpoint --> Resume[现场核验与恢复]
-    Resume --> Loop
+    Input[任务输入] --> Loop[模型与 Agent Loop]
+    Loop --> Plan[计划与步骤依赖]
+    Loop --> Runtime[工具执行]
+    Runtime --> Approval[补丁暂存与审批]
+    Approval --> Workspace[临时目标仓库]
+    Runtime --> Test[真实测试进程]
+    Test --> Evidence[退出码与内容摘要]
+    Workspace --> Evidence
+    Evidence --> Contract[完成契约]
+    Contract --> Loop
+    Loop --> Checkpoint[状态与存档]
+    Checkpoint --> Inspect[恢复前现场核验]
+    Inspect --> Loop
 ```
 
-建议阅读顺序：
+| 层 | 输入和输出 | 主要职责 | 不能替代什么 |
+| --- | --- | --- | --- |
+| 模型适配 | 消息、工具声明 → 文本或工具提议 | 处理供应商协议、鉴权和流式事件 | 业务授权、文件写入、验收 |
+| Tool Runtime | 工具 ID、参数、主机上下文 → 结构化结果与证据 | 校验、权限、执行、错误归一化 | 操作系统或容器隔离 |
+| Agent Loop | 上下文和工具结果 → 下一轮模型请求 | 迭代、取消、轮数与重复动作保护 | 可靠的完成标准 |
+| Planning | 目标、步骤、依赖、证据 → 计划快照 | 有序推进和可解释修订 | 真正执行和测试 |
+| State / Checkpoint | 状态、现场摘要、执行记录 → 恢复判断 | 判断能否续跑、哪些操作结果不明 | 自动撤销外部副作用 |
+| Completion Contract | 当前内容和各范围的最近结果 → 缺项清单 | 阻止旧证据、空交付物和提前结束 | 判断未定义的业务正确性 |
+| Sandbox | 文件、命令、网络、资源策略 → 受限制的执行环境 | 限制允许动作的实际影响 | 业务权限和最终验收 |
 
-- `src/cli.ts`、`src/run-context.ts`：理解新运行、暂停、恢复、重跑和工作区路径。
-- `src/agent-runner.ts`、`src/pi-tools.ts`：查看 Loop Hook 与模型工具到 Runtime 的投影。
-- `src/runtime.ts`、`src/test-process.ts`：检查补丁、取消、超时、进程组终止和真实退出码。
-- `src/plan-store.ts`、`src/completion-contract.ts`：查看步骤依赖及完成证据判定。
-- `src/task-record.ts`、`src/checkpoint.ts`、`src/resume.ts`：查看状态迁移与恢复现场核验。
-- `src/approval.ts`、`src/approval-flow.ts`：查看批准内容与文件内容哈希的绑定。
+读文件越界先看 Runtime 的路径与允许列表；具体补丁未被批准看审批记录；文件或网络被隔离环境拒绝再看 Sandbox 策略。各工具按动作性质组合检查，没有一条适用于所有工具的固定审批顺序。
 
-最终 Harness 新增 `GATEWAY_MODEL` 配置，用于选择 Gateway 已公开的模型别名；缺省仍为课程原来的 `agent-default`。接入 1-7 Gateway 可设置为 `smart`，具体步骤见 [Harness README](../course_code/week03/3-5/harness_agent/README.md)。
+这些层的关系是组合关系。提示词要求“不要访问敏感文件”不能替代 Runtime 的路径检查；Runtime 拒绝某个路径也不能证明宿主操作系统已被隔离。
 
-## 已落地的工程改进
+## 第一周：从调用协议到输出协议
 
-| 原问题 | 改动 | 验证方式 |
+### Chat、Responses 和 Streaming
+
+`1-2/chat.py` 观察 Chat 的 `messages`、`finish_reason` 和 `usage`；`responses.py` 观察 Responses 的 `input`、`status` 和类型化 `output`。当前 DeepSeek 的 Responses 是无服务端会话存储的接口，客户端需发送完整历史；不能根据响应 ID 推断服务器会保留对话。[官方 Responses 说明](https://api-docs.deepseek.com/guides/responses_api/)。
+
+`1-3/app.py` 再把一次生成与浏览器订阅拆开：`POST /v1/runs` 创建运行，`GET /v1/runs/{runId}/events` 订阅或重放事件，`POST /v1/runs/{runId}/cancel` 显式取消。浏览器断开订阅后运行可以继续；刷新时重复 POST 则会创建另一笔模型调用。事件和运行状态存在当前进程内，服务重启后不能恢复。
+
+这里的事件重放与第三周业务恢复解决不同问题：前者让客户端补看已发生的输出，后者决定已经发生的文件修改和工具执行能否继续。
+
+### 三层输出校验
+
+完整入口为 `1-5/deepseek_structured_demo.py`：
+
+1. Responses `text.format` 把期望 JSON Schema 发给供应商。
+2. Pydantic 严格解析，拒绝额外字段、错误类型、非法动作和长度越界。
+3. 业务校验要求 `search_docs` 有 query 且 answer 为 null，`finish` 有 answer 且 query 为 null。
+
+例如 `{"action":"finish","query":null,"answer":null}` 在字段层看起来齐全，业务层仍必须拒绝。模型没有资料时返回 `search_docs`，只是有效的下一步决策，尚未完成查询。
+
+格式或业务校验失败时，示例把错误反馈给模型，默认最多纠错一次。网络错误不会进入格式纠错循环；不把“重发 HTTP 请求”和“要求模型修复 JSON”混成同一个重试策略。这里未引入缓存降级或真实搜索，旧片段中的这些概念仍需结合课件组装。
+
+### 两个 Gateway 版本
+
+`1-6/gateway.py` 使用自有 `/v1/llm` 协议，是一个原型：模型白名单、Prompt 选择、有限重试、JSON 模式和进程内 Trace。默认主备路由都使用 `deepseek-flash`，备用需要单独配置密钥；同一供应商并不能隔离供应商整体故障。它不提供 1-7 的持久化用量、统一鉴权或模型目录。
+
+`1-7/llm-gateway` 提供 OpenAI 兼容入口，调用链是：
+
+| 文件/对象 | 工作内容 | 失败怎样传播 |
 | --- | --- | --- |
-| 非法 Schema 可导致未处理异常或被流式请求直接转发 | 提前校验两种 API 的格式与 Schema，返回明确 422 | 30 个错误用例先复现失败，再通过；另有 2 个合法请求用例 |
-| 六个 Agent 的锁文件不满足干净安装 | 补齐平台包并修正 esbuild 的依赖布局，保留已有依赖版本 | 六个项目的 `npm ci`、测试和编译 |
-| Gateway 文档引用不存在的 `.env.example` | 添加占位配置模板 | 模板路径和 Git 忽略规则检查 |
-| 最终 Harness 固定别名与 Gateway 示例配置不一致 | 添加 `GATEWAY_MODEL` 与模板 | 默认值、覆盖值和空值回退测试 |
-| 缺少根目录工程入口 | 添加 Make、版本提示、EditorConfig、中文开发说明 | 目标命令实际执行、语法与差异检查 |
-| 缺少统一 CI | 添加 Gateway、Tools、六个 Agents、Commerce 离线 jobs | 本机执行对应命令；远程状态看 Actions 页面 |
-| 最终 Harness 缺少 README | 补充离线实验、联调、模块职责与恢复入口 | 固定动作实验完成暂停、续跑和交付 |
-| 注释缺少职责说明 | 补充配置、路由、Schema 与调用编排的设计注释 | Gateway Ruff 与回归测试 |
+| `app/main.py` | 生命周期创建配置、账本、Prompt、Router、Client、Service | 初始化失败影响 readiness |
+| `api/routes.py` | HTTP 解析、鉴权、限流、依赖注入 | 入参错误 422；鉴权错误 401 |
+| `GatewayService.prepare_body` | 校验 Schema，渲染版本化 Prompt，去掉网关字段 | 调用方非法 Schema 在访问上游前返回 422 |
+| `ModelRouter.candidates` | 按协议、开关、熔断与策略选择候选 | 没有可用路由时明确失败 |
+| `UpstreamClient` | HTTP 请求、连接生命周期、供应商错误包装 | Service 决定是否重试或换候选 |
+| `structured.py`、`usage.py` | 非流式结果校验与纠错；写用量记录 | 无法修复时 422；价格缺失时成本字段为 0 |
 
-## 验证范围
+Schema 自身是否合法与输出是否符合 Schema 是两次不同检查。前者用 `jsonschema` 的方言选择和 `check_schema`，不能把它当作任意供应商都接受此 Schema 的证明。[jsonschema 文档](https://python-jsonschema.readthedocs.io/en/stable/validate/)。
 
-本机环境：macOS、Node.js 24.14.0、Python 3.12.14。CI 使用 Linux、Node.js 22.19.0 与 Python 3.12。测试数是本次验证结果，后续可能增加。
+流式输出一旦向客户端发送数据，就不能无损重试或换另一模型续写。网关在首块之前处理可重试失败；发送后报告错误并结束。流式结果不会经过完整的本地 Schema 校验与纠错。可选 Stream Checkpoint 保存的是生成正文，默认关闭；用量表不保存 Prompt 正文。
 
-| 模块 | 通过测试数 | 其他检查 |
-| --- | ---: | --- |
-| Gateway | 38 | 锁定依赖、Ruff |
-| Tool Runtime / 2-2 | 3 | 离线执行 |
-| Tool Governance / 2-4 | 19 | 离线执行 |
-| 3-1 / codebase_agent_demo | 6 | TypeScript 编译 |
-| 3-1 / codebasedemo | 33 | TypeScript 编译 |
-| 3-2 / codebase_agent_demo | 6 | TypeScript 编译 |
-| 3-2 / planning_agent_demo | 18 | TypeScript 编译 |
-| 3-3 / planning_agent_demo | 33 | TypeScript 编译 |
-| 3-5 / harness_agent | 56 | TypeScript 编译、脚本化 Harness 闭环 |
-| Commerce Python | 1104 | 1 个原有行业契约用例按适用条件跳过；Ruff、一致性脚本 |
-| 合计 | 1325 | 六个 Agent 的生产依赖 npm audit 均为 0 条已知漏洞 |
+当前默认配置只有一个官方 DeepSeek 上游；`smart`、`fast` 是公开别名。成本、Prompt 版本、限流和 fallback 仅对经过网关的请求生效。六个第三周 Agent 的默认路径是官网直连。
 
-npm audit 使用官方 registry 查询（2026-10-02），覆盖六个课程 Agent 的生产依赖。它的结果不能替代安全审查，也未覆盖 Commerce Web 或 Python 依赖。
+## 第二周：工具声明与执行分开
 
-独立验收入口：
+`2-1/minimal_tool_loop.py` 展示基本循环：模型提出调用 → Python 校验并执行 → 按调用 ID 回传 → 继续推理。工具 JSON Schema 描述参数，但授权信息由宿主上下文提供，不能让模型自己声明权限。
 
-- Commerce Web：在 `course_code/week03/3-5/commerce-agents/examples/` 执行 `npm ci` 和 `npm run build`，再按行业 README 启动界面。本次未执行八个 Web 应用的构建或浏览器验收。
-- Gateway Docker：在 Gateway 目录执行 `docker compose up --build`。本次未执行 Docker 镜像构建。
-- Sandbox：按 `course_code/week03/3-4/` 对应课件与演示配置运行。本次未启动 Sandbox 服务。
-- 真实模型：配置 Gateway 供应商后运行 Harness 的 `npm start` 或 `npm run lab:cycle`。本次使用离线模型，不消耗真实模型额度。
-- 课件 PDF 与早期单文件演示：本次完成目录索引，未逐份审阅课件或运行所有演示。
+`2-2/tool_runtime_demo_v2.py` 把定义、注册表、快照和 Runtime 分开。快照让模型看到一组确定的工具版本；运行时重新检查开关、依赖和权限，旧快照不能绕过紧急停用。准备失败同样进入结果封装与审计，模型得到可关联原调用的结构化错误。
 
-## 后续工程重点
+`2-3` 的 MCP 示例负责发现远端能力、限定名称、归一化结果；MCP Server 返回的内容仍是不可信输入。Host 需要继续做权限和大小限制，不能把发现工具当作授权工具。[本章 README](../course_code/week02/2-3/README.md)固定 SDK v2 的直接依赖并提供无模型入口；stdio 订单查询已单独联调，未接入根检查，也未验收模型 Loop 和 HTTP 路径。
 
-Gateway 的空 API Key 列表允许匿名开发模式，Prompt、管理接口与流式存档使用同一鉴权入口；实际服务需明确管理员权限、租户隔离和持久化正文的访问控制。限流和熔断只在进程内生效，多副本需要共享状态。
+`2-4` 保留了 v1、v2 和较完整的演示，三者能力不同。v2 的测试主要覆盖参数校验、白名单/权限、执行错误和审计脱敏；较完整演示另有审批、风险分类及超时处理。不要根据章节主题把每一版都描述成已实现所有治理功能。
 
-Harness 的路径检查是词法检查，读取与补丁操作仍运行在宿主环境；生产代码执行需要结合 3-4 的 Sandbox，进一步约束符号链接、文件权限、网络和资源。Checkpoint 适用于课堂单运行流程，持久化耐久性和多写入者协调应在服务化时补充。
+`2-5` 是两个 ZIP 对照工程，包含“带超时问题”和“修复后”版本，未作为展开后的独立项目接入 Make。需要先在临时目录解压并核对各自依赖，不能直接按 `.py` 入口运行。
 
-下一轮可从真实 Gateway 联调、Commerce 前端验收、第二周依赖锁定及容器化验证展开，每次选一条完整链路并添加相应验证。
+对有副作用的工具，超时只说明调用方没有得到完整结果，并不证明操作没有发生。重试前需要幂等键、结果查询或人工核查；这个原则也影响第三周的恢复逻辑。
+
+## 第三周：计划、证据和恢复
+
+### 版本演进
+
+| 版本 | 新增职责 | 用什么观察变化 |
+| --- | --- | --- |
+| 3-1 Codebase | pi Loop、Runtime 投影、轮数与重复保护 | 读取源码并生成 `login-flow.md` |
+| 3-2 Planning | 步骤依赖、证据、原子修订、完成契约 | 对照无计划与有计划的修复任务 |
+| 3-3 State | 状态迁移、业务存档、审批、恢复和重跑 | 中断后核验现场，拒绝结果不明的写操作 |
+| 3-5 Harness | 内容绑定证据、真实测试进程、取消传播、恢复现场核验 | 当前代码是否真的通过所有约定范围 |
+
+早期项目的 `npm start` 可能直接操作其 fixtures，故建议在临时副本里运行。完整 Harness 入口会复制 fixtures 到独立工作区；离线实验与真实模型共用 CLI、Runtime 和完成契约，替换的是提供下一步动作的模型。
+
+### 什么算有效证据
+
+完成契约读取 Runtime 提供的现场，不接受模型自报的哈希。修改证据必须对应当前目标源码；交付文档必须存在、非空，且内容与最后写入证据一致。
+
+测试至少覆盖 `target`、`boundary`、`regression` 三个范围。每个范围先取最近一次尝试，再判断 `resultCode`、退出码、稳定性和摘要。例如先通过、随后同范围超时，旧通过不能继续用于交付；测试通过后又修改源码、测试或配置，也需要重跑。
+
+`r1` 只是当前运行内的业务版本标识，不是 Git 提交。内容摘要用来证明记录与当前文件一致；它无法证明测试已经覆盖所有业务情况。
+
+### 审批和恢复
+
+`approval.ts` / `approval-flow.ts` 暂存具体补丁并绑定摘要，审批对象是这份内容。文件变化后需要重新核验，不能拿先前的“同意修改”批准另一份补丁。
+
+`checkpoint.ts` 保存业务状态；`journal.ts` 记录已启动和已结束的操作；`resume.ts` 先检查存档、工作区、任务状态和执行记录，随后才还原对象并续跑。上次动作分为已完成、未开始、结果不明三种状态。启动过但没有结束记录的写操作不得自动重放。
+
+`--pause-after N` 在完整轮次和存档结束后暂停，支持续跑；SIGINT 进入取消终态。`--resume` 继续同一现场，`--replay` 用原任务和当前课程 fixtures 创建独立现场，两者不能混用。resume 不会重建缺失的目标 repo，现场缺失会拒绝恢复；需要重新开始时使用 replay。完整命令见 [Harness README](../course_code/week03/3-5/harness_agent/README.md)。
+
+当前文件与测试操作在宿主机执行。POSIX 使用进程组清理测试子进程，应用层路径限制和审批仍不能替代 Sandbox；符号链接、网络、资源限制与多租户隔离需要实际沙箱部署验证。
+
+`test-process.ts` 先发送 TERM，再按宽限期发送 KILL，并等待输出管道关闭及进程组消失。macOS 的进程组回收可能短暂返回 EPERM，此时继续核查；持续权限错误或管道不关闭则在清理期限后失败。这里优先保留“无法确认”的失败结果，避免把尚存活的测试进程记成正常结束。[Apple XNU 的进程组信号实现](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_sig.c)。
+
+## Commerce：同一结果有两个消费者
+
+Commerce 保留 Anthropic Apache-2.0 版权和分包结构。核心业务位于 `shopping-agent/core`、`merchant-agent/core`，Messages Runtime 处理手写多轮调用，`examples/demo_common` 负责会话、SSE 和宿主边界；SDK 与 Managed Agents 是另两条消费路径。
+
+`ToolOutcome` 一面给模型提供工具结果，一面给宿主提供可呈现的结构化事件。前端卡片来自工具事件和服务端已知数据，而不是让模型凭空构造可信 UI 数据。
+
+Shopping 的来源记录限制可操作商品；Merchant 的来源、业务 Guardrail 和主机审批共同控制变更。`stage_*` 写入 ChangeLedger 待处理队列，`apply_change` 才应用，并重新检查限制；会话里“用户说同意”不能替代宿主批准的 change ID。
+
+本 fork 只在本地 Messages 示例部署层增加 DeepSeek 配置。主模型、记忆和分析委派统一为 Flash，保留核心门禁；原生托管工具关闭，平台部署材料保持原要求。后端和会话是演示实现，不能直接当作真实电商认证、支付或持久化方案。
+
+## 工程整理的选择
+
+依赖沿用原边界：Gateway 有 `uv.lock`，六个 Agent 有 `package-lock.json`，Commerce 使用固定版本与本地包；第二周仍是范围依赖。根 Make 与 CI 统一运行检查，不把全部项目强行合并成一个包。
+
+这种选择保留了逐版比较和独立启动，代价是模型接入代码需要在六个项目同步维护。因此连接测试按同一契约核对默认模型、地址、鉴权和实际请求体；只更新一个版本会留下可检测的差异。
+
+| 具体问题 | 设计选择与取舍 | 当前结果依据 |
+| --- | --- | --- |
+| 模型可能用旧测试结果宣布修复完成 | 完成契约绑定当前内容，并取每种范围的最近尝试；需要重跑测试和计算摘要 | Harness 离线回归、真实 Flash 修复后的三种测试范围及交付物 |
+| 崩溃可能发生在写文件之后、存档之前 | 分开保存现场和执行记录，结果不明时停止自动续跑；牺牲无条件恢复，避免重复副作用 | 中断回归拒绝自动重复补丁；实际暂停/续跑来自离线实验 |
+| Commerce 的业务 Runtime 已与 Anthropic 工具协议结合 | 在示例部署层接入官方 Messages 兼容协议，复用业务核心；兼容范围需要单独验证 | 四行业配置回归与零售两角色单轮联调，尚无托管部署结论 |
+
+本轮工程化贡献是接入、校验、复现与说明。原课程结构、pi 和 Commerce 的核心实现来自上游；当前结果没有生产上线、性能增益或业务收益的统计证据。
+
+本轮注释集中解释协议能力、配置来源、预算含义、错误传播、证据和恢复条件。历史真实运行记录、课件及压缩包按当时背景保留，不因默认模型变化而改写原实验结论。
+
+本机和真实接口的当前证据见[验证记录](verification.md)。未覆盖的 Web、Docker、Sandbox 和托管部署应各自验收，不能由后端测试通过推导为已完成。

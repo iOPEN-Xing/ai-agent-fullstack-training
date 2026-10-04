@@ -1,5 +1,7 @@
 # Week 03
 
+课程主题与实际可运行入口需要区分。逐章入口、片段和验收范围见[课程代码指南](../../docs/course-guide.md)；当前模型配置见 [DeepSeek 接入](../../docs/deepseek.md)。下表介绍学习内容，不表示每个文件已实现所有列出的能力。
+
 | 小节 | 主题 | 主要内容 |
 | --- | --- | --- |
 | [3-1](./3-1/) | 从 Runtime 到 Agent Loop | 将第二章 Tool Runtime 接入 pi 的 `runAgentLoop`，让 Tool Result 回写 Context 驱动多轮循环；区分 Function Calling、Tool Runtime、Agent Loop 与 LoopGuard 四层职责，实现最大轮数、重复动作指纹、完成条件校验与 Follow-up 等循环保护，并预留中断与恢复的快照接口，以"对登录仓库做代码理解并生成 `artifacts/login-flow.md`"为案例完成 TDD 验收。 |
@@ -17,9 +19,9 @@
 ## 3-2 目录说明
 
 - `codebase_agent_demo/`：对照组，3.1 的 Loop 加上修复任务所需的 fixtures 测试与可注入完成契约。
-- `planning_agent_demo/`：实验组，Loop 加计划层，含 18 个测试用例（13 个计划层规则 + 5 个 Loop 集成）与一次真实运行的交付物 `artifacts/login-fix.md`。
+- `planning_agent_demo/`：实验组，Loop 加计划层，原计划/Loop 测试外，现增加官方连接测试；当前结果见验证记录与一次真实运行的交付物 `artifacts/login-fix.md`。
 - `compare-agents.sh`：用同一条提示词依次运行两个 Agent，并把过程分别写入运行记录。
-- `codebase.md` / `planning.md`：两次真实 Gateway 运行的过程与结果记录（8 轮 38 条工具调用 vs 17 轮 77 条工具调用）。
+- `codebase.md` / `planning.md`：历史两次真实 Gateway 运行的过程与结果记录（8 轮 38 条工具调用 vs 17 轮 77 条工具调用）。
 
 ## 3-3 目录说明
 

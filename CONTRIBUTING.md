@@ -14,6 +14,10 @@ Gateway 检查会自动从 `uv.lock` 安装开发依赖。第二周工具示例�
 
 `.env`、`gateway.yaml`、数据库、依赖目录和运行存档已加入忽略规则。需要新增配置项时，更新对应的 `.env.example`，只填写占位值。课堂保留的 `artifacts/` 和 fixtures 属于学习材料；运行产物优先写入临时工作区。
 
+Commerce 的环境路径可用 `COMMERCE_VENV` 指定；安装和检查应传同一绝对路径。例如 `make install-commerce COMMERCE_VENV=/tmp/commerce-dev` 后用 `make check-commerce COMMERCE_VENV=/tmp/commerce-dev`。macOS 上遇到 editable 包存在却无法导入时，用 `ls -lO <环境>/lib/python3.12/site-packages/*.pth` 检查 hidden 标记，说明见 [验证记录](docs/verification.md)。
+
+真实模型入口见 [DeepSeek 接入](docs/deepseek.md)；`make check-live` 读取根 `.env` 并会产生 API 费用，不属于离线 CI。文档维护后执行 `make check-docs`，再人工核对代码块中的命令和版本差异。
+
 ## 修改与验证
 
 1. 保留按周和小节排列的目录结构，先确认当前文件属于哪一版课堂示例。
@@ -34,7 +38,7 @@ git commit -m "fix(module): describe the behavior change"
 git push -u origin HEAD
 ```
 
-`origin` 指向自己的 fork。当前工程改动分支为 `engineering/annotate-and-validate`，可通过 GitHub Compare 审阅，再合并到 fork 的 `main`。
+`origin` 指向自己的 fork。上面的新分支命令用于独立变更；当前工程整理系列沿用 `engineering/annotate-and-validate`，尚未合入 `main`，可通过 GitHub Compare 审阅，再合并到 fork 的 `main`。
 
 ## 同步课程上游
 
