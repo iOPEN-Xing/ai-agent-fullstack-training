@@ -116,6 +116,7 @@ export class DemoToolRuntime {
       repoDigest,
       runtimeDigest,
       suites: [context.targetSuite, context.boundarySuite, context.regressionSuite],
+      testTimeoutMs: context.testTimeoutMs,
       node: process.version,
     }));
   }
@@ -416,6 +417,7 @@ export class DemoToolRuntime {
         cwd: request.context.runtimeRoot,
         signal: request.signal,
         maxBuffer: 4 * 1024 * 1024,
+        timeoutMs: request.context.testTimeoutMs,
       });
       exitCode = result.exitCode;
       output = `${result.stdout}${result.stderr}`;

@@ -28,6 +28,8 @@ export interface DemoExecutionContext {
   verificationPaths: string[];
   /** tsx 的解析/执行配置，路径相对 runtimeRoot。 */
   runtimeVerificationPaths: string[];
+  /** 单次测试进程的墙钟预算；与模型轮数预算分开，默认 30 秒。 */
+  testTimeoutMs: number;
 }
 
 const PROJECT_ROOT = path.resolve(
@@ -39,8 +41,13 @@ export function createExecutionContext(
   overrides: Partial<DemoExecutionContext> = {},
 ): DemoExecutionContext {
   const projectRoot = overrides.projectRoot ?? PROJECT_ROOT;
+  const testTimeoutMs = overrides.testTimeoutMs ?? 30_000;
+  if (!Number.isInteger(testTimeoutMs) || testTimeoutMs <= 0 || testTimeoutMs > 2_147_483_647) {
+    throw new Error("testTimeoutMs 必须是有效的正整数毫秒数");
+  }
   return {
     projectRoot,
+    testTimeoutMs,
     runtimeRoot: overrides.runtimeRoot ?? projectRoot,
     repoRoot: overrides.repoRoot ?? path.join(projectRoot, "fixtures", "demo-app"),
     artifactRoot: overrides.artifactRoot ?? path.join(projectRoot, "artifacts"),
