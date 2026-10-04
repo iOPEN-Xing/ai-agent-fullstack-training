@@ -15,7 +15,7 @@ make check
 npm --prefix course_code/week03/3-5/harness_agent run lab:harness
 ```
 
-`make check` 覆盖已接入的 Gateway、Tools、六个 Agent、Commerce 和完整输出校验示例，使用 HTTP Mock 或固定模型动作，不需要密钥。早期片段、MCP、Web、Sandbox 与托管部署的范围见[验证记录](docs/verification.md)。`lab:harness` 在临时工作区里复现登录测试失败、修复、暂停、恢复和交付，不会修复原始 fixtures。正常报告应显示 `任务状态：completed` 与 `停止原因：COMPLETED`；进程 exit 0 也可能表示等待审批或暂停。
+`make check` 覆盖 Gateway、Tools、MCP Host、六个 Agent、Commerce、完整输出校验和文档源码对应检查，使用 HTTP Mock、真实本地 stdio 或固定模型动作，不需要密钥。早期片段、Web、Sandbox 与托管部署的范围见[验证记录](docs/verification.md)。`lab:harness` 在临时工作区里复现登录测试失败、修复、暂停、恢复和交付，不会修复原始 fixtures。正常报告应显示 `任务状态：completed` 与 `停止原因：COMPLETED`；进程 exit 0 也可能表示等待审批或暂停。
 
 真实模型调用先配置根目录 `.env`：
 
@@ -34,6 +34,9 @@ npm --prefix course_code/week03/3-5/harness_agent start
 | --- | --- |
 | [课程代码指南](docs/course-guide.md) | 每章看什么、哪个文件能运行、哪些文件需要结合课件阅读 |
 | [工程结构与设计边界](docs/engineering.md) | 模型、工具、计划、状态和证据怎样协作，失败时由谁处理 |
+| [结构化输出链路](docs/structured-output.md) | 原生 Schema、严格类型、业务组合和有限纠错对应哪些函数与测试 |
+| [MCP Host 链路](docs/mcp-host.md) | 能力发现、授权、参数校验、多工具回传及未知结果怎样推进 |
+| [Harness 生命周期](docs/harness-lifecycle.md) | 具体补丁审批、真实测试证据、完成判断和恢复核验怎样协作 |
 | [DeepSeek 接入](docs/deepseek.md) | 配置从哪里来、使用哪种 API、如何判断兼容性 |
 | [验证记录](docs/verification.md) | 检查覆盖了什么、真实运行结果是什么、哪些部分尚未验收 |
 | [开发与远程同步](CONTRIBUTING.md) | 安装、修改、提交和同步上游 |

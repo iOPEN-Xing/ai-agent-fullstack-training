@@ -16,7 +16,9 @@ Gateway 检查会自动从 `uv.lock` 安装开发依赖。第二周工具示例�
 
 Commerce 的环境路径可用 `COMMERCE_VENV` 指定；安装和检查应传同一绝对路径。例如 `make install-commerce COMMERCE_VENV=/tmp/commerce-dev` 后用 `make check-commerce COMMERCE_VENV=/tmp/commerce-dev`。macOS 上遇到 editable 包存在却无法导入时，用 `ls -lO <环境>/lib/python3.12/site-packages/*.pth` 检查 hidden 标记，说明见 [验证记录](docs/verification.md)。
 
-真实模型入口见 [DeepSeek 接入](docs/deepseek.md)；`make check-live` 读取根 `.env` 并会产生 API 费用，不属于离线 CI。文档维护后执行 `make check-docs`，再人工核对代码块中的命令和版本差异。
+真实模型入口见 [DeepSeek 接入](docs/deepseek.md)；`make check-live` 读取根 `.env` 并会产生 API 费用，不属于离线 CI。MCP Host 的锁定环境与真实 stdio 检查由 `make check-mcp` 管理。
+
+文档维护后执行 `make check-docs`，同时检查本地链接、章节锚点和 [源码对应表](docs/code-map.json)。重命名关键函数或新增完整链路时，同步对应文档小节、源码符号与测试引用；预算、结果字段和恢复条件的语义仍需人工对照，代码块中的命令也要实际执行。机制和边界见 [工程说明](docs/engineering.md#文档与源码怎样保持对应)。
 
 ## 修改与验证
 

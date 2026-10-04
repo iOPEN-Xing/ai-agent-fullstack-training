@@ -20,6 +20,7 @@ COMMERCE_MODEL_PROVIDER=deepseek
 | 六个 TypeScript Agent 的 `npm start` | shell 变量优先；随后本项目 `.env` 优先于根 `.env` | 只接受 `https://api.deepseek.com` 和 `/v1`，统一为 `/v1` |
 | 根 `make check-live` | uv 的 `--env-file .env`；shell 变量优先 | 检查官方地址，接受官方根路径或 `/v1` |
 | 完整 Structured Output 示例 | 同上；读取 key/model | 固定 `https://api.deepseek.com/v1/responses`，不读取 `DEEPSEEK_BASE_URL` |
+| MCP 模型入口 | 只读进程环境；uv 从根目录用 `--env-file "$PWD/.env"` 显式加载 | 只接受官方根路径或 `/v1`；完整 Host 要加 `--live` |
 | 早期 Python 示例 | 只读取已导出的进程环境；模型默认值写在示例中 | 课程默认官方地址，个别原型保留可配置的供应商地址 |
 | Commerce 本地示例 | shell、行业 `.env`、Commerce 根 `.env`，按这个顺序填缺项 | `deepseek` 配置固定 Anthropic 兼容地址 |
 | 1-7 Gateway | YAML 引用进程环境；使用自己的 `.env` | YAML 的供应商地址不带 `/v1`，客户端再追加路径 |
@@ -54,9 +55,15 @@ uv run --env-file .env --project course_code/week01/1-7/llm-gateway --locked \
 
 # 第三周完整 Harness：默认创建临时工作区，等待具体补丁审批。
 npm --prefix course_code/week03/3-5/harness_agent start
+
+# 第二周完整 MCP Host：只读订单查询，显式开启真实模型。
+uv run --env-file "$PWD/.env" --directory course_code/week02/2-3 --locked \
+  python mcp_host_v1.py --live
 ```
 
 输出校验示例正常会返回 `search_docs` 决策和 query；它表示下一步需要检索，不能把它当作已有政策答案。该示例依赖 HTTPX 和 Pydantic，复用已锁定的 Gateway 环境；早期 OpenAI SDK 示例需另外安装 SDK，见[课程指南](course-guide.md)。
+
+MCP 使用自己的锁定环境，默认不带 `--live` 时只执行离线契约。uv 的 `--directory` 改变运行目录，因此 `.env` 要先用根目录的 `$PWD` 定位。按函数阅读与失败语义见 [MCP Host 链路](mcp-host.md)。
 
 ### 思考模式与多轮工具
 

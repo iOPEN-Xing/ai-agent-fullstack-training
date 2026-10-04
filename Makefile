@@ -22,7 +22,7 @@ help:
 	  'make check-mcp       MCP Host、真实 stdio 契约与 Ruff 检查' \
 	  'make check-agents    六个 Agent 示例的测试与 TypeScript 编译' \
 	  'make check-commerce  Commerce 后端测试、Ruff 与一致性检查' \
-	  'make check-docs      本地文档链接与章节锚点检查' \
+	  'make check-docs      文档链接、源码对应关系与检查器回归' \
 	  'make check-reference 完整 Structured Output 示例测试和静态检查' \
 	  'make check-live      DeepSeek 官网小额联调（需要根 .env，会产生费用）'
 
@@ -66,4 +66,6 @@ check-live:
 	$(UV) run --env-file .env --project $(GATEWAY_DIR) --locked --extra dev python scripts/verify_deepseek.py
 
 check-docs:
+	$(UV) run --project $(GATEWAY_DIR) --locked --extra dev python -m pytest -q scripts/test_check_docs.py
+	$(UV) run --project $(GATEWAY_DIR) --locked --extra dev ruff check scripts/check_docs.py scripts/test_check_docs.py
 	$(UV) run --project $(GATEWAY_DIR) --locked --extra dev python scripts/check_docs.py

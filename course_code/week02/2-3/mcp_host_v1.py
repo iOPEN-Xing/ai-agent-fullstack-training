@@ -21,7 +21,7 @@ from mcp_client_v1 import base_dir, result_payload
 
 @dataclass(frozen=True)
 class ToolCall:
-    """Host 交给 Runtime 执行的一次已解析工具调用。"""
+    """Host 交给 Runtime 的工具提议；参数仍需校验。"""
 
     id: str
     name: str
@@ -160,7 +160,7 @@ class ToolRuntime:
             # 已进入远端调用，超时或断连都不能证明副作用没有发生。
             # 不自动重试，也不把可能含凭证的传输异常直接放进模型上下文。
             result = {"ok": False, "code": "TOOL_RESULT_UNKNOWN"}
-        # 关联 ID 由 Host 生成，远端业务字段无权覆盖。
+        # 关联 ID 固定为原调用 ID，远端业务字段无权覆盖。
         result = {**result, "tool_call_id": call.id}
         self.trace.append(
             {

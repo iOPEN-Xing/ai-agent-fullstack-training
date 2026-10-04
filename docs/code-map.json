@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "document": "docs/structured-output.md#决策链路",
+      "source": "course_code/week01/1-5/deepseek_structured_demo.py",
+      "symbols": [
+        "AgentDecision",
+        "AgentDecision.check_action_fields",
+        "decide",
+        "call_deepseek",
+        "main"
+      ],
+      "tests": [
+        "course_code/week01/1-5/test_deepseek_structured_demo.py"
+      ]
+    },
+    {
+      "document": "docs/mcp-host.md#能力发现",
+      "source": "course_code/week02/2-3/mcp_host_v1.py",
+      "symbols": [
+        "discover_tools",
+        "ToolDefinition.to_model_tool"
+      ],
+      "tests": [
+        "course_code/week02/2-3/tests/test_host_runtime.py",
+        "course_code/week02/2-3/tests/test_stdio_contract.py"
+      ]
+    },
+    {
+      "document": "docs/mcp-host.md#模型消息",
+      "source": "course_code/week02/2-3/mcp_host_v1.py",
+      "symbols": [
+        "DeepSeekProvider.complete"
+      ],
+      "tests": [
+        "course_code/week02/2-3/tests/test_host_loop.py"
+      ]
+    },
+    {
+      "document": "docs/mcp-host.md#执行边界",
+      "source": "course_code/week02/2-3/mcp_host_v1.py",
+      "symbols": [
+        "ToolRuntime.execute"
+      ],
+      "tests": [
+        "course_code/week02/2-3/tests/test_host_runtime.py"
+      ]
+    },
+    {
+      "document": "docs/mcp-host.md#结果归一化",
+      "source": "course_code/week02/2-3/mcp_client_v1.py",
+      "symbols": [
+        "result_payload"
+      ],
+      "tests": [
+        "course_code/week02/2-3/tests/test_result_payload.py"
+      ]
+    },
+    {
+      "document": "docs/mcp-host.md#循环和预算",
+      "source": "course_code/week02/2-3/mcp_host_v1.py",
+      "symbols": [
+        "run_agent"
+      ],
+      "tests": [
+        "course_code/week02/2-3/tests/test_host_loop.py"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#任务入口",
+      "source": "course_code/week03/3-5/harness_agent/src/cli.ts",
+      "symbols": [
+        "parseCliArgs",
+        "runCli"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/lifecycle.test.ts"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#任务入口",
+      "source": "course_code/week03/3-5/harness_agent/src/run-context.ts",
+      "symbols": [
+        "createExecutionContext"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/test-budget.test.ts"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#循环与计划",
+      "source": "course_code/week03/3-5/harness_agent/src/agent-runner.ts",
+      "symbols": [
+        "runPlanningAgent"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/agent-runner.test.ts"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#循环与计划",
+      "source": "course_code/week03/3-5/harness_agent/src/plan-store.ts",
+      "symbols": [
+        "PlanStore",
+        "EvidenceStore",
+        "PlanningSession"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/plan-store.test.ts"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#循环与计划",
+      "source": "course_code/week03/3-5/harness_agent/src/task-record.ts",
+      "symbols": [
+        "TaskRecorder"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/lifecycle.test.ts"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#具体补丁审批",
+      "source": "course_code/week03/3-5/harness_agent/src/approval.ts",
+      "symbols": [
+        "ApprovalGate"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/checkpoint-resume.test.ts",
+        "course_code/week03/3-5/harness_agent/tests/lifecycle.test.ts"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#具体补丁审批",
+      "source": "course_code/week03/3-5/harness_agent/src/approval-flow.ts",
+      "symbols": [
+        "applyApprovedPatch"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/checkpoint-resume.test.ts"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#测试证据",
+      "source": "course_code/week03/3-5/harness_agent/src/runtime.ts",
+      "symbols": [
+        "DemoToolRuntime"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/harness-evidence.test.ts",
+        "course_code/week03/3-5/harness_agent/tests/test-budget.test.ts"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#测试证据",
+      "source": "course_code/week03/3-5/harness_agent/src/test-process.ts",
+      "symbols": [
+        "executeTestProcess"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/test-process.test.ts"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#完成判断",
+      "source": "course_code/week03/3-5/harness_agent/src/completion-contract.ts",
+      "symbols": [
+        "createLoginFixContract"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/harness-evidence.test.ts"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#暂停与恢复",
+      "source": "course_code/week03/3-5/harness_agent/src/checkpoint.ts",
+      "symbols": [
+        "saveCheckpoint",
+        "loadCheckpoint"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/checkpoint-resume.test.ts"
+      ]
+    },
+    {
+      "document": "docs/harness-lifecycle.md#暂停与恢复",
+      "source": "course_code/week03/3-5/harness_agent/src/resume.ts",
+      "symbols": [
+        "inspectResumeState",
+        "prepareResume"
+      ],
+      "tests": [
+        "course_code/week03/3-5/harness_agent/tests/checkpoint-resume.test.ts",
+        "course_code/week03/3-5/harness_agent/tests/lifecycle.test.ts"
+      ]
+    }
+  ]
+}

@@ -34,7 +34,7 @@ uv run --env-file .env --no-project --python work/python-demos/bin/python \
 
 这个临时环境的 SDK 版本未锁定，只用于阅读实验；要得到可复现的教学环境，应记录安装版本后单独维护锁文件。不要把它的运行结果记成 Gateway 的锁定检查结果。
 
-完整输出校验示例有锁定依赖入口，见 [DeepSeek 接入](deepseek.md)。Gateway 则按其 [README](../course_code/week01/1-7/llm-gateway/README.md)在模块目录启动，不需要先启动第三周 Agent。
+完整输出校验示例有锁定依赖入口，见 [DeepSeek 接入](deepseek.md)，逐函数与失败分支见 [结构化输出链路](structured-output.md)。Gateway 则按其 [README](../course_code/week01/1-7/llm-gateway/README.md)在模块目录启动，不需要先启动第三周 Agent。
 
 ## 第二周
 
@@ -42,7 +42,7 @@ uv run --env-file .env --no-project --python work/python-demos/bin/python \
 | --- | --- | --- | --- |
 | 2-1 | `minimal_tool_loop.py`、`model_select.py` | SDK 独立演示；其余工具定义多为片段 | 工具调用 ID、参数校验、宿主授权与结果回传 |
 | 2-2 | `tool_runtime_demo_v2.py`、`test_tool_runtime_demo_v2.py` | 独立 Runtime 演示；离线测试已接入 | 定义/注册/快照/执行职责分离，旧快照仍受运行时停用控制 |
-| 2-3 | `mcp_server_v1.py`、`mcp_client_v1.py`、`loop_v1.py`、`mcp_host_v1.py` | MCP 程序；SDK 直接依赖固定，stdio 单独联调，未接入根检查 | Client 拉起 Server、工具发现、名称投影、返回内容限制 |
+| 2-3 | `mcp_server_v1.py`、`mcp_client_v1.py`、`loop_v1.py`、`mcp_host_v1.py` | 独立锁定环境，真实 stdio 与 Host 回归已接入根检查 | 白名单、Schema 校验、多工具回传、超时与结果归一化 |
 | 2-4 | `tool_governance_v1.py`、`tool_governance_v2.py`、`tool_governance_demo.py` 与测试 | 治理的不同版本；离线测试已接入 | 对照每版实际能力，避免把 v2 描述成具备全部审批与超时功能 |
 | 2-5 | 两个 `agent-tool-runtime-pi-v2` ZIP | 未展开的前后版本 | 在临时目录解压对照超时问题，不当作当前可直接启动项目 |
 
@@ -60,7 +60,7 @@ uv run --env-file .env --no-project \
   python course_code/week02/2-2/tool_runtime_demo_v2.py
 ```
 
-MCP 示例的 `mcp.Client` / `MCPServer` 接口使用 SDK v2；最小命令、固定版本和验证范围见 [2-3 README](../course_code/week02/2-3/README.md)。先运行无模型的 Client/Server，再接入模型 Loop；不要复用 Commerce 的 SDK v1 环境。
+MCP 示例的 `mcp.Client` / `MCPServer` 接口使用 SDK v2；最小命令、固定版本和验证范围见 [2-3 README](../course_code/week02/2-3/README.md)，源码与测试对应见 [MCP Host 链路](mcp-host.md)。`make check-mcp` 无需密钥；先运行无模型的 Client/Server，再接入模型 Loop，不要复用 Commerce 的 SDK v1 环境。
 
 ## 第三周
 
@@ -76,6 +76,8 @@ MCP 示例的 `mcp.Client` / `MCPServer` 接口使用 SDK v2；最小命令、�
 | `3-5/harness_agent` | 完整修复与交付实验 | `cli.ts`、`runtime.ts`、`test-process.ts`、`completion-contract.ts` |
 
 早期项目的真实 `start` 会按自身上下文写 fixtures 或 artifacts，建议复制到临时目录再运行。离线测试使用受控模型；完整 Harness 创建独立工作区，适合先观察完整任务流程。fixtures 中有意保留的登录过期错误是修复任务输入，不是需要直接修复的项目缺陷。
+
+具体补丁、当前证据、完成契约和恢复核查的调用关系见 [Harness 生命周期](harness-lifecycle.md)。
 
 3-2 的 `codebase.md`、`planning.md` 和 3-3 的交付说明保存当时的真实 Gateway 结果。轮数、模型和工具数量是历史实验数据，不是当前 Flash 的性能保证。
 

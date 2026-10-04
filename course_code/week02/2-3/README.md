@@ -2,6 +2,8 @@
 
 先运行没有模型的 Client/Server，再阅读 `loop_v1.py` 和 `mcp_host_v1.py`。四个文件是两层演示，不需要一起启动。
 
+逐函数、错误分支和测试对应关系见 [MCP Host 链路](../../../docs/mcp-host.md)。
+
 | 文件 | 作用 |
 | --- | --- |
 | `mcp_server_v1.py` | 注册订单工具、只读 Resource 和 Prompt；默认 stdio，也可用 `--http` |

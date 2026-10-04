@@ -4,22 +4,24 @@
 
 ## 离线检查
 
-根 `make check` 运行 Gateway、工具、六个 Agent、Commerce 和完整输出校验示例。测试通过不表示课件中的每个片段都可运行。
+根 `make check` 运行 Gateway、工具、MCP Host、六个 Agent、Commerce、完整输出校验和文档源码对应检查。测试通过不表示课件中的每个片段都可运行。
 
 | 范围 | 通过数 | 其他检查 |
 | --- | ---: | --- |
 | Gateway / 1-7 | 38 | 锁定依赖、Ruff |
 | Tool Runtime / 2-2 | 3 | 离线工具执行 |
+| MCP Host / 2-3 | 27 | 锁定依赖、真实 stdio、模型 HTTP Mock、Ruff |
 | Tool Governance / 2-4 | 19 | 参数、权限、审计与执行错误 |
 | 3-1 / codebase_agent_demo | 18 | TypeScript 编译 |
 | 3-1 / codebasedemo | 39 | TypeScript 编译 |
 | 3-2 / codebase_agent_demo | 18 | TypeScript 编译 |
 | 3-2 / planning_agent_demo | 30 | TypeScript 编译 |
 | 3-3 / planning_agent_demo | 45 | TypeScript 编译 |
-| 3-5 / harness_agent | 68 | TypeScript 编译 |
+| 3-5 / harness_agent | 71 | TypeScript 编译；新增真实挂起测试的预算回归 |
 | Commerce Python | 1116 | 1 个原有条件跳过、Ruff、`scripts/check.py` |
 | 完整 Structured Output | 5 | 三层校验、纠错上限、传输错误、Ruff |
-| 合计 | 1399 | 跳过用例不计入通过数 |
+| 文档源码对应检查器 | 9 | 重命名、注释/字符串伪声明、链接及测试失效 |
+| 合计 | 1438 | 跳过用例不计入通过数 |
 
 连接测试覆盖官方模型默认值、模型覆盖、密钥来源、URL 规范化与非法地址、显式关闭思考的实际请求和 SSE 解析。Commerce 新增四个行业的模型工厂、缺密钥、旧鉴权替换及不兼容配置回归。以上测试使用 Mock，不发送真实密钥。
 
@@ -33,6 +35,8 @@ make check COMMERCE_VENV=/tmp/ai-agent-commerce-20261004
 `COMMERCE_VENV` 是 Make 新增的可选路径；默认仍为 Commerce 目录内 `.venv`，CI 使用这个默认路径；以上 hidden 标记问题是在本机 macOS 工作区观察到的。运行 API 时要使用实际安装环境的 Python；`/tmp` 路径只适用于临时验证，长期开发选用不会被工作区管理器隐藏的目录。
 
 Harness 取消测试补充了三种权限错误场景：短暂 EPERM 等待回收、持续探测错误明确失败、拒绝信号且管道未关闭时在清理期限内失败。持续失败不会被当作进程已清理。
+
+本轮另补单次测试的默认 30 秒预算；预算由宿主配置且进入验证指纹。MCP 覆盖空错误、多文本和非法结果、模型同轮多调用、白名单、本地参数拒绝、关联 ID、未知结果与取消传播。stdio 契约读取真实 Resource/Prompt；模型请求形态和多调用用 Mock 验证，真实接口结果另列。
 
 Commerce 有两条依赖警告（Starlette TestClient 和 Pydantic Settings），未为了消除警告修改原有固定依赖。六个 Agent 的依赖版本与锁文件没有因模型接入而更新；之前生产依赖审计结果不能代表本次重新审计。
 
@@ -63,19 +67,23 @@ Commerce 有两条依赖警告（Starlette TestClient 和 Pydantic Settings）�
 
 `npm run lab:harness` 的固定动作实验另外完成了暂停、存档、历史回灌续跑、审批和交付核验。真实模型任务成功不代表真实模型的暂停/恢复实验也已执行；恢复的当前证据来自离线脚本和回归测试。
 
+在本轮测试预算和控制流整理后，离线 `lab:harness` 再次完成，仍核对历史回灌、一次修改和三个测试范围。上述 19 轮真实模型修复来自前一轮接入验收，本轮没有再次发送同一 Harness 修复任务。
+
+MCP 完整 Host 本轮使用 `mcp_host_v1.py --live` 联调，默认白名单只有 get_order。实际 3 轮：先取得 ord_missing 的明确 ORDER_NOT_FOUND，再查询 ord_1002 得到 shipped、1599 分，最后生成答案。运行前还通过固定成功、参数拒绝、远端错误三个契约检查；没有调用 create_ticket。
+
 Commerce 零售 Shopping 与 Merchant 各跑了一轮官方模型请求，使用内存 Mock 后端；两者都出现 Tool Call、Tool Result、UI 和 `turn_complete`，未出现 error 事件。输入分别为只读商品推荐和业务快照；未验证变更审批、记忆提取、分析委派或其他三个行业的真实调用。
 
 ## 资料检查与人工复核
 
-常用 Markdown 维护文档链接检查覆盖根 README、CONTRIBUTING、docs、周索引、六个 Agent README 和两版 Gateway README 以及 MCP 章节 README 的本地链接与章节锚点。它检查引用位置，不验证所有 shell 代码块。命令、环境优先级和状态语义仍需对照代码及实际运行。
+常用 Markdown 维护文档链接检查覆盖根 README、CONTRIBUTING、docs、周索引、六个 Agent README 和两版 Gateway README 以及 MCP 章节 README 的本地链接与章节锚点。新增三份深入链路文档与 code-map，当前 21 份文档、18 条对应关系、28 个关键符号。对应检查核对小节、定义和源码/测试链接，不验证所有 shell 代码块，也不自动证明业务语义一致；命令、环境优先级和状态语义仍需对照代码及实际运行。
 
-本轮按“入口 → 模块 → 错误/恢复 → 验收范围”整理文档，并用官方 `deepseek-flash` 分三批做文字、技术和修订后复核。审核意见需要再由源码和运行证据确认；模型审核本身不是事实依据。前两批共 25 条建议、末批 8 条，补齐 API 拒绝原因、固定地址说明、恢复条件和状态判读，并拒绝由缺少审阅材料推导出的错误结论。历史课件、运行记录和 ZIP 不因当前默认模型变化而改写。
+前一轮文档用官方 `deepseek-flash` 分三批做文字与技术复核，前两批共 25 条建议、末批 8 条，意见再由源码和运行证据确认。本轮深入整理直接核对函数、控制流、状态、错误分支与测试，并以回归检查防止关键引用漂移；不把模型审核意见作为事实依据。历史课件、运行记录和 ZIP 不因当前默认模型变化而改写。
 
 ## 未覆盖的部分
 
 - 八个 Commerce Web 应用未重新构建或进行浏览器验收；查看各行业 README 的入口。
 - Docker、pi-sandbox、OpenSandbox 未启动；应用层检查不能替代隔离测试。
 - Commerce SDK、Managed Agents 和定时托管部署未迁移或联调。
-- MCP stdio 的工具发现和固定订单查询单独通过；模型 Loop、HTTP、Resource/Prompt 和工单工具未验收，传递依赖未完整锁定。早期 SDK 演示未逐一运行。
+- MCP stdio、Resource/Prompt 契约和完整 Host 的官方模型查询已验收，依赖已锁定；HTTP 传输和工单变更仍未验收。较短 loop_v1 的请求由 Mock 检查，本轮未真实执行；早期 SDK 演示也未逐一运行。
 - 课件 PDF 未逐页审阅，2-5 ZIP 未解压验收。
 - GitHub Actions 是否通过需查看对应提交的远程运行，不能用本机结果代替。
