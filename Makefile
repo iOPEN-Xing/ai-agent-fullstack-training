@@ -1,5 +1,6 @@
 UV ?= uv
 GATEWAY_DIR := course_code/week01/1-7/llm-gateway
+MCP_DIR := course_code/week02/2-3
 COMMERCE_DIR := course_code/week03/3-5/commerce-agents
 COMMERCE_VENV ?= $(abspath $(COMMERCE_DIR)/.venv)
 AGENT_PROJECTS := \
@@ -10,7 +11,7 @@ AGENT_PROJECTS := \
 	course_code/week03/3-3/planning_agent_demo \
 	course_code/week03/3-5/harness_agent
 
-.PHONY: help install-agents install-commerce check check-gateway check-tools check-agents check-commerce check-reference check-live check-docs
+.PHONY: help install-agents install-commerce check check-gateway check-tools check-mcp check-agents check-commerce check-reference check-live check-docs
 
 help:
 	@printf '%s\n' 'make install-agents  安装六个 Agent 示例的锁定依赖' \
@@ -18,6 +19,7 @@ help:
 	  'make check           运行所有已接入的离线检查' \
 	  'make check-gateway   Gateway 测试与 Ruff 检查' \
 	  'make check-tools     第二周的离线工具治理测试' \
+	  'make check-mcp       MCP Host、真实 stdio 契约与 Ruff 检查' \
 	  'make check-agents    六个 Agent 示例的测试与 TypeScript 编译' \
 	  'make check-commerce  Commerce 后端测试、Ruff 与一致性检查' \
 	  'make check-docs      本地文档链接与章节锚点检查' \
@@ -31,7 +33,7 @@ install-commerce:
 	cd $(COMMERCE_DIR) && $(UV) venv --allow-existing "$(COMMERCE_VENV)"
 	cd $(COMMERCE_DIR) && $(UV) pip install --python "$(COMMERCE_VENV)/bin/python" -r requirements-dev.txt
 
-check: check-gateway check-tools check-agents check-commerce check-reference check-docs
+check: check-gateway check-tools check-mcp check-agents check-commerce check-reference check-docs
 
 check-gateway:
 	$(UV) run --directory $(GATEWAY_DIR) --locked --extra dev python -m pytest -q
@@ -40,6 +42,10 @@ check-gateway:
 check-tools:
 	cd course_code/week02/2-2 && $(UV) run --no-project --with-requirements requirements.txt python -m pytest -q
 	cd course_code/week02/2-4 && $(UV) run --no-project --with-requirements requirements.txt python -m pytest -q
+
+check-mcp:
+	$(UV) run --directory $(MCP_DIR) --locked --extra dev python -m pytest -q
+	$(UV) run --directory $(MCP_DIR) --locked --extra dev ruff check .
 
 check-agents:
 	@set -e; for project in $(AGENT_PROJECTS); do \

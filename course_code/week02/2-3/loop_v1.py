@@ -50,6 +50,8 @@ class OpenAIProvider:
             messages=messages,
             tools=model_tools,
             tool_choice="auto",
+            max_tokens=1024,
+            extra_body={"thinking": {"type": "disabled"}},
         )
         assistant = response.choices[0].message
         tool_calls = [
@@ -147,9 +149,7 @@ def validate_arguments(schema: dict[str, Any] | None, value: Any) -> str | None:
         expected_type = item.get("type")
         if expected_type == "string" and not isinstance(value[name], str):
             return f"参数 {name} 必须是字符串。"
-        if expected_type == "integer" and (
-            not isinstance(value[name], int) or isinstance(value[name], bool)
-        ):
+        if expected_type == "integer" and (not isinstance(value[name], int) or isinstance(value[name], bool)):
             return f"参数 {name} 必须是整数。"
     return None
 
@@ -214,16 +214,20 @@ async def run_order_agent(
 
 def create_provider() -> OpenAIProvider:
     """读取环境变量并创建不自动重试的 DeepSeek Provider。"""
-    api_key = os.getenv("DEEPSEEK_API_KEY")
-    if not api_key:
+    api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
+    if not api_key or api_key.startswith("replace-"):
         raise RuntimeError("请先设置环境变量 DEEPSEEK_API_KEY")
+    base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1").strip().rstrip("/")
+    if base_url not in {"https://api.deepseek.com", "https://api.deepseek.com/v1"}:
+        raise RuntimeError("DEEPSEEK_BASE_URL 必须使用官方地址")
     return OpenAIProvider(
         AsyncOpenAI(
             api_key=api_key,
-            base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+            base_url=base_url,
             max_retries=0,
+            timeout=30,
         ),
-        os.getenv("DEEPSEEK_MODEL", "deepseek-flash"),
+        os.getenv("DEEPSEEK_MODEL", "").strip() or "deepseek-flash",
     )
 
 
@@ -234,18 +238,21 @@ async def main() -> None:
         args=[str(base_dir / "mcp_server_v1.py")],
         cwd=base_dir,
     )
-    async with Client(stdio_client(parameters)) as client:
-        listed_tools = await client.list_tools()
-        runtime = MCPToolRuntime(
-            client,
-            {tool.name: tool.input_schema for tool in listed_tools.tools},
-        )
-        answer = await run_order_agent(
-            "请查询订单 ord_1001 的当前状态，并简洁说明。",
-            create_provider(),
-            runtime,
-            to_provider_tools(listed_tools.tools),
-        )
+    provider = create_provider()
+    try:
+        async with Client(stdio_client(parameters)) as client:
+            listed_tools = await client.list_tools()
+            # 这个入口只演示查询；发现工单工具不会自动开放写入能力。
+            allowed_tools = [tool for tool in listed_tools.tools if tool.name == "get_order"]
+            runtime = MCPToolRuntime(client, {tool.name: tool.input_schema for tool in allowed_tools})
+            answer = await run_order_agent(
+                "请查询订单 ord_1001 的当前状态，并简洁说明。",
+                provider,
+                runtime,
+                to_provider_tools(allowed_tools),
+            )
+    finally:
+        await provider.client.close()
     print(answer)
     print(json.dumps(runtime.trace, ensure_ascii=False, indent=2))
 
@@ -255,3 +262,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except RuntimeError as exc:
         print(f"运行失败: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc

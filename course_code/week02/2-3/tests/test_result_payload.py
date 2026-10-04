@@ -6,8 +6,11 @@ from mcp_client_v1 import result_payload
 
 
 def response(*texts, is_error=False, structured=None):
-    return SimpleNamespace(is_error=is_error, structured_content=structured,
-                           content=[SimpleNamespace(text=text) for text in texts])
+    return SimpleNamespace(
+        is_error=is_error,
+        structured_content=structured,
+        content=[SimpleNamespace(text=text) for text in texts],
+    )
 
 
 def test_empty_remote_error_is_reported_without_indexing_missing_content():

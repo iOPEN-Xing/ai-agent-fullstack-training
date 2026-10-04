@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import argparse
 import json
+import math
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Protocol
+from collections.abc import Awaitable, Callable
+from typing import Any, Protocol
 
 from jsonschema import ValidationError, validate
+from jsonschema.validators import validator_for
 from mcp import Client, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from openai import AsyncOpenAI
@@ -21,15 +25,16 @@ class ToolCall:
 
     id: str
     name: str
-    arguments: dict[str, Any]
+    arguments: Any  # 参数是模型输出，Runtime 校验前不能假定已经是对象。
 
 
 @dataclass(frozen=True)
 class ModelReply:
-    """Provider 单轮返回的最终文本或单次工具调用。"""
+    """保留完整 assistant 消息；同轮工具调用按原顺序逐一回传。"""
 
     text: str | None = None
-    tool_call: ToolCall | None = None
+    tool_calls: tuple[ToolCall, ...] = ()
+    message: dict[str, Any] | None = None
 
 
 class LLMProvider(Protocol):
@@ -47,14 +52,18 @@ class DeepSeekProvider:
 
     def __init__(self) -> None:
         """读取模型配置并创建禁用 SDK 自动重试的异步客户端。"""
-        api_key = os.getenv("DEEPSEEK_API_KEY")
-        if not api_key:
+        api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
+        if not api_key or api_key.startswith("replace-"):
             raise RuntimeError("请先设置环境变量 DEEPSEEK_API_KEY")
-        self.model = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
+        base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1").strip().rstrip("/")
+        if base_url not in {"https://api.deepseek.com", "https://api.deepseek.com/v1"}:
+            raise RuntimeError("DEEPSEEK_BASE_URL 必须使用官方地址")
+        self.model = os.getenv("DEEPSEEK_MODEL", "").strip() or "deepseek-flash"
         self.client = AsyncOpenAI(
             api_key=api_key,
-            base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+            base_url=base_url,
             max_retries=0,
+            timeout=30,
         )
 
     async def complete(
@@ -62,28 +71,28 @@ class DeepSeekProvider:
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
     ) -> ModelReply:
-        """请求模型，提取首个 Tool Call 或最终文本。"""
+        """关闭思考并限制输出；原生字段和全部 Tool Call 都进入回复。"""
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=messages,
             tools=tools,
             tool_choice="auto",
+            max_tokens=1024,
+            extra_body={"thinking": {"type": "disabled"}},
         )
         message = response.choices[0].message
-        if message.tool_calls:
-            call = message.tool_calls[0]
+        calls = []
+        for call in message.tool_calls or []:
             try:
-                arguments = json.loads(call.function.arguments or "{}")
+                arguments = json.loads(call.function.arguments or "null")
             except json.JSONDecodeError:
-                arguments = {}
-            return ModelReply(
-                tool_call=ToolCall(
-                    id=call.id,
-                    name=call.function.name,
-                    arguments=arguments,
-                )
-            )
-        return ModelReply(text=message.content or "")
+                arguments = None  # 非法参数交给 Runtime 拒绝，不能变成可执行的空对象。
+            calls.append(ToolCall(call.id, call.function.name, arguments))
+        return ModelReply(
+            text=None if calls else message.content,
+            tool_calls=tuple(calls),
+            message=message.model_dump(exclude_none=True),
+        )
 
 
 ToolHandler = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
@@ -113,8 +122,11 @@ class ToolDefinition:
 class ToolRuntime:
     """在调用 MCP Server 前执行工具查找、参数校验与执行轨迹记录。"""
 
-    def __init__(self) -> None:
+    def __init__(self, timeout_seconds: float = 10) -> None:
         """初始化空的执行轨迹，供副作用和调用顺序断言使用。"""
+        if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+            raise ValueError("timeout_seconds 必须为有限正数")
+        self.timeout_seconds = timeout_seconds
         self.trace: list[dict[str, Any]] = []
 
     async def execute(
@@ -126,6 +138,8 @@ class ToolRuntime:
         tool = tools.get(call.name)
         if not tool:
             return self._reject(call, "TOOL_NOT_FOUND")
+        if not isinstance(call.arguments, dict):
+            return self._reject(call, "INVALID_ARGUMENT", "工具参数必须是 JSON 对象")
         try:
             validate(instance=call.arguments, schema=tool.input_schema)
         except ValidationError as exc:
@@ -139,7 +153,15 @@ class ToolRuntime:
                 "arguments": call.arguments,
             }
         )
-        result = await tool.handler(call.id, call.arguments)
+        try:
+            async with asyncio.timeout(self.timeout_seconds):
+                result = await tool.handler(call.id, call.arguments)
+        except Exception:
+            # 已进入远端调用，超时或断连都不能证明副作用没有发生。
+            # 不自动重试，也不把可能含凭证的传输异常直接放进模型上下文。
+            result = {"ok": False, "code": "TOOL_RESULT_UNKNOWN"}
+        # 关联 ID 由 Host 生成，远端业务字段无权覆盖。
+        result = {**result, "tool_call_id": call.id}
         self.trace.append(
             {
                 "event": "tool_result",
@@ -157,7 +179,7 @@ class ToolRuntime:
         message: str | None = None,
     ) -> dict[str, Any]:
         """记录本地拒绝，并返回未触发 Server 调用的结构化错误。"""
-        payload = {"ok": False, "code": code}
+        payload = {"ok": False, "code": code, "tool_call_id": call.id}
         if message:
             payload["message"] = message
         self.trace.append(
@@ -174,11 +196,16 @@ class ToolRuntime:
 async def discover_tools(
     client: Client,
     server_id: str,
+    *,
+    allowed_names: set[str],
 ) -> dict[str, ToolDefinition]:
-    """发现远端 MCP 工具，命名转换后注册为 Host 可执行工具。"""
+    """只投影 Host 允许的工具；发现能力不会自动授予执行权限。"""
     result = await client.list_tools()
     definitions: dict[str, ToolDefinition] = {}
     for remote in result.tools:
+        if remote.name not in allowed_names:
+            continue
+        validator_for(remote.input_schema).check_schema(remote.input_schema)
         qualified_name = f"{server_id}_{remote.name}"
 
         async def handler(
@@ -188,7 +215,7 @@ async def discover_tools(
         ) -> dict[str, Any]:
             """调用原始 MCP 工具名，并将远端结果归一化为 Host Payload。"""
             response = await client.call_tool(remote_name, arguments)
-            return {"tool_call_id": tool_call_id, **result_payload(response)}
+            return result_payload(response)
 
         definitions[qualified_name] = ToolDefinition(
             name=qualified_name,
@@ -205,59 +232,47 @@ async def run_agent(
     tools: dict[str, ToolDefinition],
     user_input: str,
     max_rounds: int = 4,
+    max_tool_calls: int = 8,
 ) -> str:
-    """持续执行模型决策、Runtime 调用和结果回写，直到模型返回文本。"""
+    """有限轮次内回传每个调用的结果；原生消息不重新拼装。"""
+    if max_rounds < 1 or max_tool_calls < 1:
+        raise ValueError("轮次与工具调用预算必须为正整数")
     messages: list[dict[str, Any]] = [{"role": "user", "content": user_input}]
     model_tools = [tool.to_model_tool() for tool in tools.values()]
+    tool_calls_used = 0
 
     for round_no in range(1, max_rounds + 1):
         reply = await provider.complete(messages, model_tools)
-        if reply.text is not None:
+        if reply.message is None:
+            raise RuntimeError("MODEL_REPLY_INVALID")
+        messages.append(reply.message)
+        if not reply.tool_calls and reply.text and reply.text.strip():
             print("LOOP", round_no, "final")
             return reply.text
-        if reply.tool_call is None:
+        if not reply.tool_calls:
             raise RuntimeError("MODEL_REPLY_INVALID")
-
-        print("LOOP", round_no, "tool_call", reply.tool_call.name)
-        messages.append(
-            {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": reply.tool_call.id,
-                        "type": "function",
-                        "function": {
-                            "name": reply.tool_call.name,
-                            "arguments": json.dumps(
-                                reply.tool_call.arguments,
-                                ensure_ascii=False,
-                            ),
-                        },
-                    }
-                ],
-            }
-        )
-        tool_result = await runtime.execute(reply.tool_call, tools)
-        messages.append(
-            {
-                "role": "tool",
-                "tool_call_id": reply.tool_call.id,
-                "content": json.dumps(tool_result, ensure_ascii=False),
-            }
-        )
-        runtime.trace.append(
-            {
-                "event": "result_written_to_context",
-                "round": round_no,
-                "tool_call_id": reply.tool_call.id,
-            }
-        )
+        # 先检查整批调用，避免超预算时已经执行了一部分副作用。
+        if tool_calls_used + len(reply.tool_calls) > max_tool_calls:
+            raise RuntimeError("MAX_TOOL_CALLS_EXCEEDED")
+        for call in reply.tool_calls:
+            tool_calls_used += 1
+            print("LOOP", round_no, "tool_call", call.name)
+            tool_result = await runtime.execute(call, tools)
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "content": json.dumps(tool_result, ensure_ascii=False),
+                }
+            )
+            runtime.trace.append(
+                {"event": "result_written_to_context", "round": round_no, "tool_call_id": call.id}
+            )
 
     raise RuntimeError("MAX_ROUNDS_EXCEEDED")
 
 
-async def main() -> None:
+async def main(live: bool = False) -> None:
     """启动本地订单 Server，并执行协议契约检查及可选的真实 Agent Loop。"""
     parameters = StdioServerParameters(
         command=sys.executable,
@@ -266,7 +281,7 @@ async def main() -> None:
     )
 
     async with Client(stdio_client(parameters)) as client:
-        tools = await discover_tools(client, "orders")
+        tools = await discover_tools(client, "orders", allowed_names={"get_order"})
         resources = await client.list_resources()
         prompts = await client.list_prompts()
 
@@ -301,23 +316,29 @@ async def main() -> None:
         assert failed["code"] == "MCP_TOOL_ERROR"
         print("FAIL", failed["code"])
 
-        if "DEEPSEEK_API_KEY" not in os.environ:
-            print("LIVE SKIP：设置 DEEPSEEK_API_KEY 后运行真实 Agent Loop")
+        if not live:
+            print("LIVE SKIP：使用 --live 显式运行真实 Agent Loop")
             print(json.dumps(runtime.trace, ensure_ascii=False, indent=2))
             return
 
-        answer = await run_agent(
-            provider=DeepSeekProvider(),
-            runtime=runtime,
-            tools=tools,
-            user_input=(
-                "先查询订单 ord_missing；如果工具明确返回订单不存在，"
-                "再查询 ord_1002，并告诉我最终查到的订单状态。"
-            ),
-        )
+        provider = DeepSeekProvider()
+        try:
+            answer = await run_agent(
+                provider=provider,
+                runtime=runtime,
+                tools=tools,
+                user_input=(
+                    "先查询订单 ord_missing；如果工具明确返回订单不存在，"
+                    "再查询 ord_1002，并告诉我最终查到的订单状态。"
+                ),
+            )
+        finally:
+            await provider.client.close()
         print("LIVE", answer)
         print(json.dumps(runtime.trace, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="订单 MCP Host：默认离线契约检查")
+    parser.add_argument("--live", action="store_true", help="使用官方 DeepSeek 执行模型循环")
+    asyncio.run(main(live=parser.parse_args().live))
